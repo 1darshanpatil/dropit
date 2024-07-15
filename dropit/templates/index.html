@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File Sharing Service</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+</head>
+
+<header>
+  <h1>Dropit- Easy Local File Sharing</h1>
+  <p>Quickly and securely share files across devices on the same network.</p>
+</header>
+
+<body>
+  <h1>Sharex</h1>
+  <form method="POST" action="/" enctype="multipart/form-data">
+    <label for="file-input">Choose Files</label>
+    <input id="file-input" type="file" name="files" multiple onchange="updateFileList()">
+    <ul id="file-list"></ul>
+    <button type="submit">Upload</button>
+  </form>
+  <h2>Uploaded Files</h2>
+  <table id="fileTable">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">File Name</th>
+            <th onclick="sortTable(1)">Type</th>
+            <th onclick="sortTable(2, true)">Size</th> <!-- Note the 'true' to handle size conversion -->
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for file in files %}
+        <tr>
+            <td>{{ file.name }}</td>
+            <td>{{ file.type }}</td>
+            <td>{{ file.size }}</td>
+            <td>
+                <div class="dropdown">
+                    <div class="dropdown-content">
+                        <a href="{{ url_for('download_file', filename=file.name) }}">Download</a>
+                        <a href="{{ url_for('delete_file', filename=file.name) }}">Delete</a>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</body>
+</html>
