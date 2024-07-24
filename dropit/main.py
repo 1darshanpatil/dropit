@@ -117,6 +117,22 @@ def print_colored_ip(ip, port, lag, cl=True):
         time.sleep(lag)  
     print("Starting the server. Please navigate to the URL shown above on your devices.")
 
+
+
+def print_colored(text, color):
+    colors = {
+        "red": "\033[1;31m",
+        "green": "\033[1;32m",
+        "yellow": "\033[1;33m",
+        "blue": "\033[1;34m",
+        "magenta": "\033[1;35m",
+        "cyan": "\033[1;36m",
+        "white": "\033[1;37m",
+        "reset": "\033[0m"
+    }
+    return f"{colors[color]}{text}{colors['reset']}"
+
+
 def run_app():
     """Starts the Flask application."""
     ip = get_ip()
@@ -130,13 +146,11 @@ def run_app():
     if args.geturl:
         print_colored_ip(ip, port, 0.5, cl=False)
         # cl = False ; To avoid clearing the QR code if printed.
-    print("\033[1;32mReady! Access the server at: \033[0m" + server_url)
-
-
-    log = logging.getLogger('werkzeug')
-    log.disabled = True
-    app.logger.disabled = True
+    print(print_colored("Server is ready! Access it at: " + server_url, "green"))
+    print(print_colored("Files can be found in: " + app.config['UPLOAD_FOLDER'], "blue"))
     app.run(host='0.0.0.0', port=port, debug=False)
 
+    
 if __name__ == '__main__':
     run_app()
+
