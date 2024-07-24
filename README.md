@@ -15,5 +15,5 @@ Dropit simplifies the process of sharing files across multiple devices, includin
 To share files with Dropit, simply run the following command in your terminal:
 
 ```bash
-dropit [--password <password>]
+dropit [--password <password>] [--geturl] [--getqr]
 
