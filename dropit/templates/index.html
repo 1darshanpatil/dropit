@@ -1,5 +1,12 @@
+<!-- This HTML file serves as the main interface for the Dropit - Easy Local File Sharing service.
+     It provides a user-friendly web page where users can upload files, view a list of uploaded files,
+     and perform actions such as downloading or deleting files. It includes responsive design features
+     for accessibility on various devices and integrates with external CSS for styling and JavaScript for functionality. -->
+
+
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,30 +31,31 @@
   <h2>Uploaded Files</h2>
   <table id="fileTable">
     <thead>
-        <tr>
-            <th onclick="sortTable(0)">File Name</th>
-            <th onclick="sortTable(1)">Type</th>
-            <th onclick="sortTable(2, true)">Size</th> 
-            <th>Actions</th>
-        </tr>
+      <tr>
+        <th onclick="sortTable(0)">File Name</th>
+        <th onclick="sortTable(1)">Type</th>
+        <th onclick="sortTable(2, true)">Size</th>
+        <th>Actions</th>
+      </tr>
     </thead>
     <tbody>
-        {% for file in files %}
-        <tr>
-            <td>{{ file.name }}</td>
-            <td>{{ file.type }}</td>
-            <td>{{ file.size }}</td>
-            <td>
-                <div class="dropdown">
-                    <div class="dropdown-content">
-                        <a href="{{ url_for('download_file', filename=file.name) }}">Download</a>
-                        <a href="{{ url_for('delete_file', filename=file.name) }}">Delete</a>
-                    </div>
-                </div>
-            </td>
-        </tr>
-        {% endfor %}
+      {% for file in files %}
+      <tr>
+        <td>{{ file.name }}</td>
+        <td>{{ file.type }}</td>
+        <td>{{ file.size }}</td>
+        <td>
+          <div class="dropdown">
+            <div class="dropdown-content">
+              <a href="{{ url_for('download_file', filename=file.name) }}">Download</a>
+              <a href="{{ url_for('delete_file', filename=file.name) }}">Delete</a>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
 </body>
+
 </html>
