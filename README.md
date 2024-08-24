@@ -1,4 +1,5 @@
 # Dropit - Simple Cross-Platform File Sharing
+![image](https://github.com/user-attachments/assets/0a711081-d9c2-4a95-9674-7239b76bcded)
 
 ![image](https://github.com/user-attachments/assets/a360f9b0-dac3-45dc-9678-0960a658588c)
 
