@@ -46,7 +46,7 @@ setup(
     'Flask==3.0.3',
     'Flask-BasicAuth==0.2.0',
     'qrcode==7.4.2',
-    'click==8.2.1',
+    'click>=8.0.0,<8.2.0',
     'Werkzeug==3.1.3',
     'Jinja2==3.1.6',
     'MarkupSafe==3.0.2',
