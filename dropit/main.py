@@ -215,7 +215,7 @@ def create_qr_in_terminal(text):
 
 
 def print_colored_ip(ip, port, lag, cl=True):
-   """
+    """
     Cycles through colors and prints the server's IP address and port in the terminal.
 
     This function is designed to catch the user's attention by displaying the IP address and port in various colors.
@@ -263,27 +263,28 @@ def print_colored(text, color):
 
 
 def run_app():
-    """
-    Main function to start the Flask application.
-
-    This function handles initialization tasks such as creating the upload folder if it doesn't exist,
-    displaying the server's URL via QR code or colored terminal text, and starting the Flask app.
-    """
-    ip = get_ip()
+    ip   = get_ip()
     port = 5001
-    server_url = f"http://{ip}:{port}"
+    # use https in the printed URL now that we're running TLS
+    server_url = f"https://{ip}:{port}"
+
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
-    
+
     if args.getqr:
         create_qr_in_terminal(server_url)
     if args.geturl:
+        # prints in color but won’t clear your QR code
         print_colored_ip(ip, port, 0.5, cl=False)
-        # cl = False ; To avoid clearing the QR code if printed.
-    print(print_colored("Server is ready! Access it at: " + server_url, "green"))
-    print(print_colored("Files can be found in: " + app.config['UPLOAD_FOLDER'], "blue"))
-    app.run(host='0.0.0.0', port=port, debug=False)
 
+    print(print_colored(f"Server is ready! Access it at: {server_url}", "green"))
+    print(print_colored(f"Files can be found in: {app.config['UPLOAD_FOLDER']}", "blue"))
+
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        ssl_context='adhoc'   # ← adds a self-signed cert on the fly
+    )
     
 if __name__ == '__main__':
     run_app()

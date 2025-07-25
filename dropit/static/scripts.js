@@ -1,33 +1,117 @@
+document.addEventListener('DOMContentLoaded', function () {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('fileInfo');
+    const dragOverlay = document.getElementById('dragOverlay');
+
+    // Open file browser when clicking on upload area
+    uploadArea.addEventListener('click', function () {
+        fileInput.click();
+    });
+
+    // Handle file selection
+    fileInput.addEventListener('change', function () {
+        updateFileList();
+    });
+
+    // Update file info display
+    function updateFileList() {
+        if (fileInput.files.length > 0) {
+            if (fileInput.files.length === 1) {
+                fileInfo.textContent = fileInput.files[0].name;
+            } else {
+                fileInfo.textContent = `${fileInput.files.length} files selected`;
+            }
+        } else {
+            fileInfo.textContent = 'No files selected';
+        }
+    }
+
+    // Drag and drop functionality
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, highlight, false);
+        document.body.addEventListener(eventName, showOverlay, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, unhighlight, false);
+        document.body.addEventListener(eventName, hideOverlay, false);
+    });
+
+    function highlight() {
+        uploadArea.classList.add('dragover');
+    }
+
+    function unhighlight() {
+        uploadArea.classList.remove('dragover');
+    }
+
+    function showOverlay() {
+        dragOverlay.classList.add('active');
+    }
+
+    function hideOverlay() {
+        dragOverlay.classList.remove('active');
+    }
+
+    // Handle file drop
+    uploadArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        fileInput.files = dt.files;
+        updateFileList();
+    }
+
+    // Initialize
+    updateFileList();
+
+    // Add active class to sort buttons when clicked
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    sortButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            sortButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+});
+
 /**
- * Dynamically updates an HTML element to display a table of files selected for upload.
- * It constructs a table showing file names, types, and sizes.
- */
+* Dynamically updates an HTML element to display a table of files selected for upload.
+* It constructs a table showing file names, types, and sizes.
+*/
 function updateFileList() {
     var input = document.getElementById('file-input');
-    var output = document.getElementById('file-list');
-    var children = "<table style='width: 100%; border-collapse: collapse;'>";
-    children += "<tr><th>Name</th><th>Type</th><th>Size</th></tr>";
+    var output = document.getElementById('fileInfo');
+    var children = "";
 
-    for (var i = 0; i < input.files.length; i++) {
-        let file = input.files.item(i);
-        let size = formatSize(file.size); 
-        let type = file.type || 'Unknown';  
-
-        children += `<tr>
-                        <td>${file.name}</td>
-                        <td>${type}</td>
-                        <td>${size}</td>
-                    </tr>`;
+    if (input.files.length === 0) {
+        output.textContent = 'No files selected';
+        return;
     }
-    children += "</table>";
-    output.innerHTML = children;
+
+    if (input.files.length === 1) {
+        output.textContent = input.files[0].name;
+    } else {
+        output.textContent = input.files.length + ' files selected';
+    }
 }
 
 /**
- * Converts file size from bytes to a more human-readable string format.
- * @param {number} bytes - The file size in bytes.
- * @return {string} The formatted file size with appropriate units.
- */
+* Converts file size from bytes to a more human-readable string format.
+* @param {number} bytes - The file size in bytes.
+* @return {string} The formatted file size with appropriate units.
+*/
 function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     else if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(2) + ' KB';
@@ -36,10 +120,10 @@ function formatSize(bytes) {
 }
 
 /**
- * Sorts an HTML table by the given column index, with optional handling for size columns.
- * @param {number} n - The column index to sort by.
- * @param {boolean} isSizeColumn - Indicates if the column contains file sizes for special handling.
- */
+* Sorts an HTML table by the given column index, with optional handling for size columns.
+* @param {number} n - The column index to sort by.
+* @param {boolean} isSizeColumn - Indicates if the column contains file sizes for special handling.
+*/
 function sortTable(n, isSizeColumn = false) {
     var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
     table = document.getElementById("fileTable");
@@ -80,13 +164,61 @@ function sortTable(n, isSizeColumn = false) {
             }
         }
     }
+
+    // Update the visible file list
+    updateVisibleFileList();
 }
 
 /**
- * Converts a human-readable file size string back to bytes for numerical comparison.
- * @param {string} sizeStr - The size string to convert (e.g., "2.5 MB").
- * @return {number} The size in bytes.
- */
+* Updates the visible file list after sorting
+*/
+function updateVisibleFileList() {
+    const table = document.getElementById('fileTable');
+    const tbody = table.querySelector('tbody');
+    const fileList = document.getElementById('fileList');
+
+    // Clear current list
+    fileList.innerHTML = '';
+
+    // Get all rows except the header
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    // Create new list items
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const listItem = document.createElement('li');
+        listItem.className = 'file-item';
+
+        listItem.innerHTML = `
+<div class="file-icon">
+<i class="fas fa-file"></i>
+</div>
+<div class="file-info">
+<div class="file-name">${cells[0].textContent}</div>
+<div class="file-meta">
+<span>${cells[1].textContent}</span>
+<span>${cells[2].textContent}</span>
+</div>
+</div>
+<div class="file-actions">
+<a href="${row.querySelector('.dropdown-content a').href}" class="action-btn" title="Download">
+<i class="fas fa-download"></i>
+</a>
+<a href="${row.querySelector('.dropdown-content a:last-child').href}" class="action-btn" title="Delete">
+<i class="fas fa-trash"></i>
+</a>
+</div>
+`;
+
+        fileList.appendChild(listItem);
+    });
+}
+
+/**
+* Converts a human-readable file size string back to bytes for numerical comparison.
+* @param {string} sizeStr - The size string to convert (e.g., "2.5 MB").
+* @return {number} The size in bytes.
+*/
 function convertToBytes(sizeStr) {
     const units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
     const size = parseFloat(sizeStr);
