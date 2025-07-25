@@ -1,3 +1,15 @@
+blinker==1.9.0
+cffi==1.17.1
+click==8.2.1
+cryptography==45.0.5
+-e git+https://github.com/1darshanpatil/dropit.git@421aad4c95546135ba88f8e94a70497177a02e30#egg=dropit
 Flask==3.0.3
 Flask-BasicAuth==0.2.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.2
+pycparser==2.22
+pypng==0.20220715.0
 qrcode==7.4.2
+typing_extensions==4.14.1
+Werkzeug==3.1.3
