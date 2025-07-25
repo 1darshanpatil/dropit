@@ -31,9 +31,6 @@ sys.path.insert(0, os.path.join(package_dir, 'sharex'))
 
 from dropit import __version__ 
 
-with open(os.path.join(package_dir, 'requirements.txt')) as f:
-    required = f.read().splitlines()
-
 setup(
     name='dropit',
     version=__version__, 
@@ -45,7 +42,22 @@ setup(
     url='https://github.com/1darshanpatil/dropit',  
     packages=find_packages(),
     include_package_data=True, 
-    install_requires=required, 
+    install_requires=[
+    'Flask==3.0.3',
+    'Flask-BasicAuth==0.2.0',
+    'qrcode==7.4.2',
+    'click==8.2.1',
+    'Werkzeug==3.1.3',
+    'Jinja2==3.1.6',
+    'MarkupSafe==3.0.2',
+    'itsdangerous==2.2.0',
+    'typing_extensions==4.14.1',
+    'blinker==1.9.0',
+    'cryptography==45.0.5',
+    'cffi==1.17.1',
+    'pycparser==2.22',
+    'pypng==0.20220715.0',
+    ],
     entry_points={
         'console_scripts': [
             'dropit=dropit.main:run_app'
