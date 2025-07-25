@@ -1,3 +1,4 @@
 dropit.egg-info
 dropit/__pycache__/
 dist/*
+build/*
