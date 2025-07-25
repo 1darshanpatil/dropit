@@ -34,10 +34,11 @@ from flask import Flask, request, render_template, redirect, url_for, send_from_
 from flask_basicauth import BasicAuth
 import time
 import qrcode
-
+from dropit import __version__ 
 
 # Setting up the argument parser for comman-line options.
 parser = argparse.ArgumentParser(description='File server with optional basic authentication.')
+parser.add_argument('--version', action='store_true', help='Print the version and exit')  # ← Add this line
 parser.add_argument('--password', help='Set the password for basic authentication.', default=None)
 parser.add_argument('--geturl', action='store_true', help='Print the URL')
 parser.add_argument('--getqr', action='store_true', help='Display a QR code')
@@ -287,5 +288,7 @@ def run_app():
     )
     
 if __name__ == '__main__':
+    if args.version:
+        print(f"dropit v{__version__} - ProjectHalley.org internal project")
+        exit(0)
     run_app()
-
