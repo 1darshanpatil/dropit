@@ -55,9 +55,3 @@ Detail other configuration settings if available, such as changing the default u
 
 Contributions are welcome! If you have improvements or bug fixes, please open a pull request. For major changes, please open an issue first to discuss what you would like to change.
 Please ensure to update tests as appropriate.
-
-
-## Contributing
-
-Contributions are welcome! If you have improvements or bug fixes, please open a pull request. For major changes, please open an issue first to discuss what you would like to change.
-Please ensure to update tests as appropriate.
