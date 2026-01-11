@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dropit - Easy Local File Sharing</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='globe.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <script src="{{ url_for('static', filename='scripts.js') }}"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -14,9 +15,12 @@
 
 <body>
   <div class="container">
-    <header>
-      <h1>Dropit</h1>
-      <p class="subtitle">Quickly and securely share files across devices on the same network</p>
+    <header class="hero">
+      <p class="eyebrow">Dropit · Local HTTPS file sharing</p>
+      <h1>Share files across your network, fast</h1>
+      <p class="subtitle">
+        Runs over HTTPS with a drag-and-drop UI. Install with <code>pip install dropit</code> and start sharing on the same Wi‑Fi/LAN.
+      </p>
     </header>
 
     <div class="upload-section">
@@ -29,7 +33,7 @@
           <input type="file" id="file-input" name="files" multiple style="display: none;">
         </div>
 
-        <button type="submit" class="btn">Upload Files</button>
+        <button type="submit" class="btn" id="uploadButton" disabled>Upload Files</button>
       </form>
     </div>
 
@@ -75,9 +79,6 @@
       <ul class="file-list" id="fileList">
         {% for file in files %}
         <li class="file-item">
-          <div class="file-icon">
-            <i class="fas fa-file"></i>
-          </div>
           <div class="file-info">
             <div class="file-name">{{ file.name }}</div>
             <div class="file-meta">
@@ -87,11 +88,9 @@
           </div>
           <div class="file-actions">
             <a href="{{ url_for('download_file', filename=file.name) }}" class="action-chip download" title="Download">
-              <span class="icon" aria-hidden="true">⬇️</span>
               <span class="label">Download</span>
             </a>
             <a href="{{ url_for('delete_file', filename=file.name) }}" class="action-chip delete" title="Delete">
-              <span class="icon" aria-hidden="true"><i class="fas fa-trash"></i></span>
               <span class="label">Delete</span>
             </a>
           </div>
