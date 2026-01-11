@@ -1,4 +1,15 @@
 dropit.egg-info
 dropit/__pycache__/
+__pycache__/
+*.py[cod]
 dist/*
 build/*
+.eggs/
+*.egg-info
+.coverage*
+.pytest_cache/
+.cache/
+.DS_Store
+.venv/
+venv/
+.env

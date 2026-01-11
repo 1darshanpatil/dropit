@@ -1,57 +1,81 @@
-# Dropit - Simple Cross-Platform File Sharing
-![image](https://github.com/user-attachments/assets/0a711081-d9c2-4a95-9674-7239b76bcded)
-![image](https://github.com/user-attachments/assets/2e3cd01d-7cdc-4e62-be6a-5159c1cc3b9a)
+# Dropit – Local HTTPS file drop
 
-Below image for legacy <= v0.1.5 ( 0.1.6 is a bug should be skipped)
-![image](https://github.com/user-attachments/assets/a360f9b0-dac3-45dc-9678-0960a658588c)
+Dropit is a small Flask app that lets you share files with other devices on the same network. It runs a local HTTPS server with a drag-and-drop UI for uploading, downloading, and deleting files.
 
-
-## Introduction
-Dropit simplifies the process of sharing files across multiple devices, including laptops and mobile phones, regardless of their operating system. Whether you're a developer working with multiple OS environments, or simply need to transfer files between devices, Dropit offers a straightforward solution.
-
-## Key Features
-- **Cross-Platform Compatibility**: Share files seamlessly between any devices on the same network.
-- **Easy to Use**: Just a single command is needed to start sharing files.
-- **Optional Password Protection**: Enhance security with an optional password.
-
-## How to Use
-To share files with Dropit, simply run the following command in your terminal:
-
+## Install
 ```bash
-dropit [--password <password>] [--geturl] [--getqr] [--maxsize <integer>]
+pip install dropit
 ```
 
-*Options*
+Python ≥ 3.6 is supported.
+
+## Commands and flags
 ```
---password: <password>: Secures your file sharing session with basic authentication.
---geturl: Prints the URL to access Dropit from the other devices.
---getqr: Displays a QR code in the terminal, which can be scanned to connect to Dropit.
---maxsize <size_in_GB>: Sets a maximum file size for uploads (default is 2GB).
+dropit [--password <password>] [--geturl] [--getqr] [--maxsize <GB>] [--version]
 ```
-**NOTE**: The default username is `admin`
+- `--password <password>`: enable Basic Auth with username `admin`.
+- `--geturl`: print the server URL in color to the terminal.
+- `--getqr`: render the URL as an ASCII QR code in the terminal.
+- `--maxsize <GB>`: maximum upload size in gigabytes (default: `2`).
+- `--version`: print the installed Dropit version and exit.
 
-*Accessing Dropit:*
+Examples:
+```bash
+# start server and print URL
+dropit --geturl
 
-Open a web browser on any device connected to the same network and enter the URL displayed in the terminal. If a password is set, you will be prompted to enter it. 
+# start server and show an ASCII QR
+dropit --getqr
 
+# require a password (user: admin)
+dropit --password "mypassword"
 
+# allow larger uploads (10 GB)
+dropit --maxsize 10
 
+# just show the installed version
+dropit --version
+```
 
-### Additional Sections
+## Quick start
+```bash
+dropit --geturl
+```
+Then, from another device on the same network, open the URL shown (e.g., `https://<your-ip>:5001`). Because the certificate is self-signed, your browser will show a warning; proceed/accept for your local session.
 
-#### Configuration Options
-Detail other configuration settings if available, such as changing the default upload folder.
+## What you get
+- Local HTTPS server on port `5001` (self-signed cert generated on the fly).
+- Drag-and-drop upload UI with file list (type/size) plus download/delete actions.
+- Optional Basic Auth: set a password and use the fixed username `admin`.
+- Handy discovery: print the URL (`--geturl`) and an ASCII QR code (`--getqr`).
+- Upload size limit configurable via `--maxsize` (default 2 GB).
+- Files are stored under your home directory in `sharex` (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows). The exact resolved path is printed on startup.
 
+## Using the web UI
+- Upload: drag files into the drop zone or click to choose files, then hit **Upload Files**.
+- Download/Delete: use the action chips next to each file in the list.
+- Storage: uploaded files are saved to `sharex` under your home directory (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows).
+
+## Authentication
+- Default: open access.
+- To require a password: start with `--password mysecret`. Sign in as `admin` with that password. Basic Auth is only enforced when a password is provided.
 
 ## Troubleshooting
-
-- **Connection Issues**: Ensure all devices are on the same network. Check firewall settings if devices cannot connect to the server.
-- **Performance Issues**: For large file transfers, ensure the server machine has sufficient resources. Consider increasing the system limits if uploads fail due to file size.
-- **Mobile Device Compatibility**: Some mobile devices might experience difficulties accessing `http` URLs.
-
-
+- **Browser warning about HTTPS**: the app uses an ad-hoc self-signed cert; choose “proceed” for your local session.
+- **Can’t reach the URL**: ensure devices are on the same network and that port `5001` is allowed through firewalls.
+- **Upload fails due to size**: increase `--maxsize` to the number of gigabytes you need.
 
 ## Contributing
+Issues and pull requests are welcome. For significant changes, please open an issue first to discuss what you’d like to adjust.
 
-Contributions are welcome! If you have improvements or bug fixes, please open a pull request. For major changes, please open an issue first to discuss what you would like to change.
-Please ensure to update tests as appropriate.
+### Contribution flow
+- Branch from `master` (e.g., `feature/...` or `fix/...`).
+- Make your change. If it affects behavior, note how to verify in the PR.
+- Quick local checks:
+  - Create/activate a virtual env to avoid polluting your global Python: `python3 -m venv .venv && source .venv/bin/activate` (on Windows: `python -m venv .venv` then `.venv\Scripts\activate`)
+  - `pip install .` (ensure dependencies and console entry work)
+  - `dropit --version` (standalone; prints the version and exits)
+  - `dropit --geturl` or `dropit --getqr` (separate run; starts the server and prints URL or QR, shows the resolved storage path)
+- Push your branch and open a PR against `master` with a short description and verification steps.
+- Releases: bump `dropit/__version__`, tag `vX.Y.Z`, and push the tag to trigger the publish workflow.
+- For larger contributions: discuss design/approach in an issue first, keep PRs focused, and add tests/docs alongside code changes so reviewers can validate quickly.

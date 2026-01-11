@@ -233,7 +233,7 @@ def print_colored_ip(ip, port, lag, cl=True):
     for color in colors:
         if cl:
             os.system('cls' if os.name == 'nt' else 'clear')  
-        print(f"{color}The URL to enter on your other device connected to the same wifi network is: http://{ip}:{port}\033[0m")
+        print(f"{color}The URL to enter on your other device connected to the same wifi network is: https://{ip}:{port}\033[0m")
         time.sleep(lag)  
     print("Starting the server. Please navigate to the URL shown above on your devices.")
 
@@ -264,6 +264,10 @@ def print_colored(text, color):
 
 
 def run_app():
+    if args.version:
+        print(f"dropit v{__version__}")
+        return
+
     ip   = get_ip()
     port = 5001
     # use https in the printed URL now that we're running TLS
@@ -272,6 +276,7 @@ def run_app():
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
 
+    home_hint = "%USERPROFILE%" if os.name == "nt" else "$HOME"
     if args.getqr:
         create_qr_in_terminal(server_url)
     if args.geturl:
@@ -279,7 +284,7 @@ def run_app():
         print_colored_ip(ip, port, 0.5, cl=False)
 
     print(print_colored(f"Server is ready! Access it at: {server_url}", "green"))
-    print(print_colored(f"Files can be found in: {app.config['UPLOAD_FOLDER']}", "blue"))
+    print(print_colored(f"Files are stored in: {app.config['UPLOAD_FOLDER']} (from {home_hint})", "blue"))
 
     app.run(
         host='0.0.0.0',
@@ -288,7 +293,4 @@ def run_app():
     )
     
 if __name__ == '__main__':
-    if args.version:
-        print(f"dropit v{__version__} - ProjectHalley.org internal project")
-        exit(0)
     run_app()
