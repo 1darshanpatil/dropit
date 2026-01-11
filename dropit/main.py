@@ -233,7 +233,7 @@ def print_colored_ip(ip, port, lag, cl=True):
     for color in colors:
         if cl:
             os.system('cls' if os.name == 'nt' else 'clear')  
-        print(f"{color}The URL to enter on your other device connected to the same wifi network is: http://{ip}:{port}\033[0m")
+        print(f"{color}The URL to enter on your other device connected to the same wifi network is: https://{ip}:{port}\033[0m")
         time.sleep(lag)  
     print("Starting the server. Please navigate to the URL shown above on your devices.")
 
@@ -293,7 +293,4 @@ def run_app():
     )
     
 if __name__ == '__main__':
-    if args.version:
-        print(f"dropit v{__version__} - ProjectHalley.org internal project")
-        exit(0)
     run_app()
