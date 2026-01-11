@@ -276,6 +276,7 @@ def run_app():
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
 
+    home_hint = "%USERPROFILE%" if os.name == "nt" else "$HOME"
     if args.getqr:
         create_qr_in_terminal(server_url)
     if args.geturl:
@@ -283,7 +284,7 @@ def run_app():
         print_colored_ip(ip, port, 0.5, cl=False)
 
     print(print_colored(f"Server is ready! Access it at: {server_url}", "green"))
-    print(print_colored(f"Files can be found in: {app.config['UPLOAD_FOLDER']}", "blue"))
+    print(print_colored(f"Files are stored in: {app.config['UPLOAD_FOLDER']} (from {home_hint})", "blue"))
 
     app.run(
         host='0.0.0.0',
