@@ -46,12 +46,12 @@ Then, from another device on the same network, open the URL shown (e.g., `https:
 - Optional Basic Auth: set a password and use the fixed username `admin`.
 - Handy discovery: print the URL (`--geturl`) and an ASCII QR code (`--getqr`).
 - Upload size limit configurable via `--maxsize` (default 2 GB).
-- Files are stored under `~/sharex/` on the machine running Dropit.
+- Files are stored under your home directory in `sharex` (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows). The exact resolved path is printed on startup.
 
 ## Using the web UI
 - Upload: drag files into the drop zone or click to choose files, then hit **Upload Files**.
 - Download/Delete: use the action chips next to each file in the list.
-- Storage: uploaded files are saved to `~/sharex/` on the host.
+- Storage: uploaded files are saved to `~/sharex/` (expanded to your home directory).
 
 ## Authentication
 - Default: open access.
