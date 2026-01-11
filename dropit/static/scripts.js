@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fileInput = document.getElementById('file-input');
     const fileInfo = document.getElementById('fileInfo');
     const dragOverlay = document.getElementById('dragOverlay');
+    const uploadButton = document.getElementById('uploadButton');
 
     // Open file browser when clicking on upload area
     uploadArea.addEventListener('click', function () {
@@ -16,14 +17,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Update file info display
     function updateFileList() {
-        if (fileInput.files.length > 0) {
-            if (fileInput.files.length === 1) {
-                fileInfo.textContent = fileInput.files[0].name;
-            } else {
-                fileInfo.textContent = `${fileInput.files.length} files selected`;
-            }
+        const count = fileInput.files.length;
+        if (count > 0) {
+            fileInfo.textContent = count === 1 ? fileInput.files[0].name : `${count} files selected`;
+            uploadButton.disabled = false;
         } else {
             fileInfo.textContent = 'No files selected';
+            uploadButton.disabled = true;
         }
     }
 
@@ -93,10 +93,11 @@ document.addEventListener('DOMContentLoaded', function () {
 function updateFileList() {
     var input = document.getElementById('file-input');
     var output = document.getElementById('fileInfo');
-    var children = "";
+    var button = document.getElementById('uploadButton');
 
     if (input.files.length === 0) {
         output.textContent = 'No files selected';
+        if (button) button.disabled = true;
         return;
     }
 
@@ -105,6 +106,8 @@ function updateFileList() {
     } else {
         output.textContent = input.files.length + ' files selected';
     }
+
+    if (button) button.disabled = false;
 }
 
 /**

@@ -33,27 +33,38 @@ body {
     padding: 16px;
 }
 
-/* Header - Minimal */
+/* Header */
 header {
     text-align: center;
-    padding: 24px 16px;
-    margin-bottom: 24px;
-    background: var(--white);
-    border: var(--border);
+    padding: 32px 20px;
+    margin-bottom: 28px;
+    background: linear-gradient(135deg, var(--primary-light), #ffffff);
+    border: 1px solid var(--light-gray);
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+.hero .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--gray);
+    margin-bottom: 8px;
 }
 
 h1 {
     color: var(--dark);
-    font-size: 2rem;
-    font-weight: 500;
-    margin-bottom: 8px;
+    font-size: 2.1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
 }
 
 .subtitle {
     color: var(--gray);
     font-size: 1rem;
-    max-width: 600px;
+    max-width: 640px;
     margin: 0 auto;
+    line-height: 1.6;
 }
 
 /* Upload Section */
@@ -430,10 +441,11 @@ table {
     }
     
     .file-item {
-        flex-direction: row;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
         min-height: auto;
         padding: 12px;
+        gap: 8px;
     }
     
     .file-icon {
@@ -450,7 +462,11 @@ table {
     }
     
     .file-name {
-        -webkit-line-clamp: 1;
+        display: block;
+        -webkit-line-clamp: unset;
+        -webkit-box-orient: unset;
+        overflow: visible;
+        white-space: normal;
         margin-bottom: 4px;
     }
     
@@ -463,6 +479,9 @@ table {
     .file-actions {
         margin-top: 0;
         flex-shrink: 0;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 10px;
     }
     
     .action-chip {
