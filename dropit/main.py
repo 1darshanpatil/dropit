@@ -264,6 +264,10 @@ def print_colored(text, color):
 
 
 def run_app():
+    if args.version:
+        print(f"dropit v{__version__}")
+        return
+
     ip   = get_ip()
     port = 5001
     # use https in the printed URL now that we're running TLS
