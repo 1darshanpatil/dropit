@@ -49,8 +49,12 @@ jobs:
               meta = next(n for n in z.namelist() if n.endswith(".dist-info/METADATA"))
               text = z.read(meta).decode("utf-8", "replace")
 
-          name = re.search(r"^Name:\\s*(.+)$", text, re.M).group(1).strip()
-          version = re.search(r"^Version:\\s*(.+)$", text, re.M).group(1).strip()
+          name_match = re.search(r"^Name:\s*(.+)$", text, re.M)
+          version_match = re.search(r"^Version:\s*(.+)$", text, re.M)
+          if not name_match or not version_match:
+              raise SystemExit("Could not parse Name/Version from wheel METADATA")
+          name = name_match.group(1).strip()
+          version = version_match.group(1).strip()
           print(name, version)
           PY
           )
