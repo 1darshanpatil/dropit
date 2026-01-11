@@ -21,8 +21,11 @@ dropit [--password <password>] [--geturl] [--getqr] [--maxsize <GB>] [--version]
 
 Examples:
 ```bash
-# start server, print URL + QR
-dropit --geturl --getqr
+# start server and print URL
+dropit --geturl
+
+# start server and show an ASCII QR
+dropit --getqr
 
 # require a password (user: admin)
 dropit --password "mypassword"
@@ -36,7 +39,7 @@ dropit --version
 
 ## Quick start
 ```bash
-dropit --geturl --getqr
+dropit --geturl
 ```
 Then, from another device on the same network, open the URL shown (e.g., `https://<your-ip>:5001`). Because the certificate is self-signed, your browser will show a warning; proceed/accept for your local session.
 
@@ -51,7 +54,7 @@ Then, from another device on the same network, open the URL shown (e.g., `https:
 ## Using the web UI
 - Upload: drag files into the drop zone or click to choose files, then hit **Upload Files**.
 - Download/Delete: use the action chips next to each file in the list.
-- Storage: uploaded files are saved to `~/sharex/` (expanded to your home directory).
+- Storage: uploaded files are saved to `sharex` under your home directory (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows).
 
 ## Authentication
 - Default: open access.
@@ -64,3 +67,15 @@ Then, from another device on the same network, open the URL shown (e.g., `https:
 
 ## Contributing
 Issues and pull requests are welcome. For significant changes, please open an issue first to discuss what you’d like to adjust.
+
+### Contribution flow
+- Branch from `master` (e.g., `feature/...` or `fix/...`).
+- Make your change. If it affects behavior, note how to verify in the PR.
+- Quick local checks:
+  - Create/activate a virtual env to avoid polluting your global Python: `python3 -m venv .venv && source .venv/bin/activate` (on Windows: `python -m venv .venv` then `.venv\Scripts\activate`)
+  - `pip install .` (ensure dependencies and console entry work)
+  - `dropit --version` (standalone; prints the version and exits)
+  - `dropit --geturl` or `dropit --getqr` (separate run; starts the server and prints URL or QR, shows the resolved storage path)
+- Push your branch and open a PR against `master` with a short description and verification steps.
+- Releases: bump `dropit/__version__`, tag `vX.Y.Z`, and push the tag to trigger the publish workflow.
+- For larger contributions: discuss design/approach in an issue first, keep PRs focused, and add tests/docs alongside code changes so reviewers can validate quickly.
