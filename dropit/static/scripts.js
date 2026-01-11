@@ -186,13 +186,13 @@ function updateVisibleFileList() {
     // Create new list items
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
+        const downloadLink = row.querySelector('.dropdown-content a');
+        const deleteLink = row.querySelector('.dropdown-content a:last-child');
+
         const listItem = document.createElement('li');
         listItem.className = 'file-item';
 
         listItem.innerHTML = `
-<div class="file-icon">
-<i class="fas fa-file"></i>
-</div>
 <div class="file-info">
 <div class="file-name">${cells[0].textContent}</div>
 <div class="file-meta">
@@ -201,11 +201,13 @@ function updateVisibleFileList() {
 </div>
 </div>
 <div class="file-actions">
-<a href="${row.querySelector('.dropdown-content a').href}" class="action-btn" title="Download">
-<i class="fas fa-download"></i>
+<a href="${downloadLink ? downloadLink.href : '#'}" class="action-chip download" title="Download">
+  <span class="icon" aria-hidden="true">⬇️</span>
+  <span class="label">Download</span>
 </a>
-<a href="${row.querySelector('.dropdown-content a:last-child').href}" class="action-btn" title="Delete">
-<i class="fas fa-trash"></i>
+<a href="${deleteLink ? deleteLink.href : '#'}" class="action-chip delete" title="Delete">
+  <span class="icon" aria-hidden="true">🗑️</span>
+  <span class="label">Delete</span>
 </a>
 </div>
 `;
