@@ -465,13 +465,9 @@ table {
         flex-shrink: 0;
     }
     
-    .action-chip .label {
-        display: none;
-    }
-    
     .action-chip {
-        padding: 6px;
-        min-width: 36px;
+        padding: 8px 10px;
+        min-width: auto;
     }
     
     .upload-area {

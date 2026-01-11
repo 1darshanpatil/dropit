@@ -202,11 +202,9 @@ function updateVisibleFileList() {
 </div>
 <div class="file-actions">
 <a href="${downloadLink ? downloadLink.href : '#'}" class="action-chip download" title="Download">
-  <span class="icon" aria-hidden="true">⬇️</span>
   <span class="label">Download</span>
 </a>
 <a href="${deleteLink ? deleteLink.href : '#'}" class="action-chip delete" title="Delete">
-  <span class="icon" aria-hidden="true">🗑️</span>
   <span class="label">Delete</span>
 </a>
 </div>

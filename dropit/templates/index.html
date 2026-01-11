@@ -85,11 +85,9 @@
           </div>
           <div class="file-actions">
             <a href="{{ url_for('download_file', filename=file.name) }}" class="action-chip download" title="Download">
-              <span class="icon" aria-hidden="true">⬇️</span>
               <span class="label">Download</span>
             </a>
             <a href="{{ url_for('delete_file', filename=file.name) }}" class="action-chip delete" title="Delete">
-              <span class="icon" aria-hidden="true"><i class="fas fa-trash"></i></span>
               <span class="label">Delete</span>
             </a>
           </div>
