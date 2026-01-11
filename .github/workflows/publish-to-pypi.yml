@@ -2,16 +2,20 @@ name: Publish to PyPI
 
 on:
   push:
-    branches: ["master"]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  build-and-publish:
-    runs-on: ubuntu-latest
+concurrency:
+  group: pypi-${{ github.ref }}
+  cancel-in-progress: false
 
+jobs:
+  build:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,23 +28,42 @@ jobs:
       - name: Build sdist and wheel
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
+          python -m pip install --upgrade build twine
           python -m build
+          python -m twine check --strict dist/*
 
-      - name: Validate package metadata
-        run: |
-          python -m pip install --upgrade twine
-          python -m twine check dist/*
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
 
-      - name: Check if this version is already on PyPI
-        id: check
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    environment:
+      name: pypi
+      url: https://pypi.org/project/dropit/
+
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Verify tag matches package version
         shell: bash
         run: |
           set -euo pipefail
 
           WHEEL="$(ls -1 dist/*.whl | head -n 1)"
+          TAG_REF="${GITHUB_REF#refs/tags/}"
 
-          # Extract Name + Version from wheel metadata (works even if version is dynamic)
           read -r NAME VERSION < <(python - <<'PY' "$WHEEL"
           import re, sys, zipfile
 
@@ -53,35 +76,27 @@ jobs:
           version_match = re.search(r"^Version:\s*(.+)$", text, re.M)
           if not name_match or not version_match:
               raise SystemExit("Could not parse Name/Version from wheel METADATA")
-          name = name_match.group(1).strip()
-          version = version_match.group(1).strip()
-          print(name, version)
+          print(name_match.group(1).strip(), version_match.group(1).strip())
           PY
           )
 
           echo "Detected package: ${NAME} ${VERSION}"
 
-          # If project doesn't exist yet on PyPI, curl will fail -> we should publish.
-          if curl -fsSL "https://pypi.org/pypi/${NAME}/json" > /tmp/pypi.json; then
-            python - <<PY
-          import json
-          data=json.load(open("/tmp/pypi.json","r",encoding="utf-8"))
-          version="${VERSION}"
-          if version in data.get("releases", {}):
-              print("publish=false")
-          else:
-              print("publish=true")
-          PY
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_VERSION="${TAG_REF#v}"
+            echo "Tag version: ${TAG_VERSION}"
+            if [ "${VERSION}" != "${TAG_VERSION}" ]; then
+              echo "Tag v${TAG_VERSION} does not match package version ${VERSION}"
+              exit 1
+            fi
           else
-            echo "publish=true"
-          fi | tee /tmp/publish_flag.txt
-
-          PUBLISH="$(cut -d= -f2 /tmp/publish_flag.txt | tail -n 1)"
-          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+            echo "Ref ${GITHUB_REF} is not a tag; skipping tag/version consistency check."
+          fi
 
       - name: Publish to PyPI
-        if: steps.check.outputs.publish == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPIRC_API_TOKEN }}
+          packages-dir: dist/
+          skip-existing: true
