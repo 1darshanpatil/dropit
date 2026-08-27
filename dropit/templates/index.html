@@ -1,112 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dropit - Easy Local File Sharing</title>
+  <meta name="theme-color" content="#d9d7d1">
+  <title>Dropit — {{ breadcrumbs[-1].name }}</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='globe.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  <script src="{{ url_for('static', filename='scripts.js') }}"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    integrity="sha512-kuPH9nG+Q/RmQ7gfT8h0bTtM1NFupPFLjO6BVUWVb8k3bx0QiJ3e8P+2vXzSxku3KObXscuGk8u6+RrmMhY1KQ=="
-    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="{{ url_for('static', filename='scripts.js') }}" defer></script>
 </head>
+<body data-max-upload="{{ max_upload_bytes }}" data-max-upload-label="{{ max_upload_label }}">
+  <svg class="svg-sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path d="M2.5 5.5h7l2 2h10v12h-19z" fill="#e3b341" stroke="#80641f"/>
+        <path d="M3 8h18" fill="none" stroke="#f7d77d"/>
+      </symbol>
+      <symbol id="icon-back" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7M8 12h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/></symbol>
+      <symbol id="icon-forward" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7m6.5-7H6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/></symbol>
+      <symbol id="icon-up" viewBox="0 0 24 24"><path d="m5 13 7-7 7 7m-7-6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter"/></symbol>
+      <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v10h-6v-6H9v6H3z" fill="#e3b341" stroke="#80641f"/></symbol>
+      <symbol id="icon-reload" viewBox="0 0 24 24"><path d="M19 8V3l-2 2a8 8 0 1 0 2.2 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/><path d="M14 3h5v5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M4 18v3h16v-3M12 17V4m-5 5 5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24"><path d="M4 18v3h16v-3M12 3v14m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14l-1 14H6zm3-3h8l1 3H7zM3 7h18" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 10v8m3-8v8m3-8v8" stroke="currentColor"/></symbol>
+      <symbol id="icon-open" viewBox="0 0 24 24"><path d="M2.5 6h7l2 2h10l-2 11h-17z" fill="#e3b341" stroke="#80641f"/><path d="m8 15 4-4 4 4m-4-4v7" fill="none" stroke="#614b18" stroke-width="1.5"/></symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="icon-view-details" viewBox="0 0 24 24"><path d="M3 4h4v4H3zm0 6h4v4H3zm0 6h4v4H3z" fill="currentColor"/><path d="M10 6h11M10 12h11M10 18h11" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="icon-view-icons" viewBox="0 0 24 24"><path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+      <symbol id="icon-file-other" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f4f4f2" stroke="#777" stroke-width="2"/><path d="M30 2v12h11" fill="#d9e4ef" stroke="#777" stroke-width="2"/></symbol>
+      <symbol id="icon-file-document" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f4f4f2" stroke="#667" stroke-width="2"/><path d="M30 2v12h11M14 23h20M14 30h20M14 37h16M14 44h18" fill="none" stroke="#6684a3" stroke-width="2"/></symbol>
+      <symbol id="icon-file-pdf" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#fff5f3" stroke="#8f3029" stroke-width="2"/><path d="M30 2v12h11" fill="#efc9c4" stroke="#8f3029" stroke-width="2"/><path d="M14 26h20v14H14z" fill="#b83227"/><path d="M17 36v-7h3.5a2 2 0 0 1 0 4H17m7-4v7h2.2c3 0 3-7 0-7zm8 7v-7h5m-5 3h4" fill="none" stroke="#fff" stroke-width="1.5"/></symbol>
+      <symbol id="icon-file-spreadsheet" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f1f8ef" stroke="#4e7849" stroke-width="2"/><path d="M30 2v12h11" fill="#c9e0c4" stroke="#4e7849" stroke-width="2"/><path d="M13 22h22v23H13zm0 7h22m-22 8h22m-14-15v23m7-23v23" fill="none" stroke="#5d8c55" stroke-width="1.5"/></symbol>
+      <symbol id="icon-file-image" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f2f8ee" stroke="#56734d" stroke-width="2"/><path d="M30 2v12h11" fill="#cee2c5" stroke="#56734d" stroke-width="2"/><path d="M13 21h22v23H13z" fill="#cce3f1" stroke="#56734d"/><circle cx="29" cy="27" r="3" fill="#f2c94c"/><path d="m14 42 7-9 5 5 3-4 6 8" fill="#76a864" stroke="#56734d"/></symbol>
+      <symbol id="icon-file-audio" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f7f0f8" stroke="#75507b" stroke-width="2"/><path d="M30 2v12h11" fill="#dbc5df" stroke="#75507b" stroke-width="2"/><path d="M30 21v18m0-18 8-2v17" fill="none" stroke="#75507b" stroke-width="3"/><circle cx="25" cy="40" r="5" fill="#ad7fa8"/><circle cx="34" cy="37" r="5" fill="#ad7fa8"/></symbol>
+      <symbol id="icon-file-video" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#eef5fa" stroke="#4b6983" stroke-width="2"/><path d="M30 2v12h11" fill="#c5d8e7" stroke="#4b6983" stroke-width="2"/><rect x="12" y="20" width="24" height="25" fill="#729fcf" stroke="#4b6983"/><path d="m21 27 10 6-10 6z" fill="#fff"/></symbol>
+      <symbol id="icon-file-archive" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#fff3df" stroke="#8f5902" stroke-width="2"/><path d="M30 2v12h11" fill="#f1cf94" stroke="#8f5902" stroke-width="2"/><path d="M22 4h7v6h-7zm0 7h7v6h-7zm0 7h7v6h-7zm0 7h7v6h-7z" fill="#c98f38" stroke="#8f5902"/><path d="M20 32h11v11H20z" fill="none" stroke="#8f5902" stroke-width="2"/></symbol>
+      <symbol id="icon-file-code" viewBox="0 0 48 56"><path d="M7 2h23l11 11v41H7z" fill="#f0f5fa" stroke="#4b627a" stroke-width="2"/><path d="M30 2v12h11" fill="#cad9e8" stroke="#4b627a" stroke-width="2"/><path d="m20 25-7 7 7 7m8-14 7 7-7 7m-3-17-3 22" fill="none" stroke="#3465a4" stroke-width="2.5"/></symbol>
+    </defs>
+  </svg>
 
-<body>
-  <div class="container">
-    <header class="hero">
-      <p class="eyebrow">Dropit - Local HTTPS file sharing</p>
-      <h1>Share files across your network, fast</h1>
-      <p class="subtitle">
-        Runs over HTTPS with a drag-and-drop UI. Install with <code>pip install dropit</code> and start sharing on the same Wi‑Fi/LAN.
-      </p>
+  <main class="manager-window" aria-label="Shared files file manager">
+    <header class="title-bar">
+      <div class="window-title">
+        <svg class="title-icon" aria-hidden="true"><use href="#icon-folder"></use></svg>
+        <h1>Dropit</h1>
+        <span class="window-subtitle">{{ breadcrumbs[-1].name }}</span>
+      </div>
+      <span class="connection-label">Local network</span>
     </header>
 
-    <div class="upload-section">
-      <h2 class="section-title">Upload Files</h2>
-
-      <form method="POST" action="/" enctype="multipart/form-data">
-        <div class="upload-area" id="uploadArea">
-          <p>Drag & drop files here or click to browse</p>
-          <p class="file-info" id="fileInfo">No files selected</p>
-          <input type="file" id="file-input" name="files" multiple style="display: none;">
+    <nav class="menu-bar" aria-label="Application menu">
+      <div class="menu">
+        <button type="button" class="menu-button" data-menu-button aria-expanded="false">File</button>
+        <div class="menu-popup" role="menu" hidden>
+          <button type="button" role="menuitem" data-command="upload">Upload Files…</button>
+          <button type="button" role="menuitem" data-command="open-selected" disabled>Open Selected</button>
+          <button type="button" role="menuitem" data-command="download-selected" disabled>Download Selected</button>
+          <button type="button" role="menuitem" class="danger-menu-item" data-command="delete-selected" disabled>Delete Selected…</button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" data-command="reload">Refresh</button>
         </div>
+      </div>
+      <div class="menu">
+        <button type="button" class="menu-button" data-menu-button aria-expanded="false">Edit</button>
+        <div class="menu-popup" role="menu" hidden>
+          <button type="button" role="menuitem" data-command="select-all">Select All</button>
+          <button type="button" role="menuitem" data-command="clear-selection">Clear Selection</button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" data-command="focus-search">Find Files</button>
+        </div>
+      </div>
+      <div class="menu">
+        <button type="button" class="menu-button" data-menu-button aria-expanded="false">View</button>
+        <div class="menu-popup" role="menu" hidden>
+          <button type="button" role="menuitemradio" class="is-checked" data-command="details-view" aria-checked="true">Details</button>
+          <button type="button" role="menuitemradio" data-command="icons-view" aria-checked="false">Icons</button>
+        </div>
+      </div>
+      <div class="menu">
+        <button type="button" class="menu-button" data-menu-button aria-expanded="false">Go</button>
+        <div class="menu-popup" role="menu" hidden>
+          <button type="button" role="menuitem" data-command="history-back">Back</button>
+          <button type="button" role="menuitem" data-command="history-forward">Forward</button>
+          <button type="button" role="menuitem" data-command="up"{% if not parent_url %} disabled{% endif %}>Parent Folder</button>
+          <div class="menu-separator" role="separator"></div>
+          <button type="button" role="menuitem" data-command="home">Shared Files</button>
+        </div>
+      </div>
+    </nav>
 
-        <button type="submit" class="btn" id="uploadButton" disabled>Upload Files</button>
-      </form>
+    <div class="tool-bar" aria-label="Navigation and view toolbar">
+      <div class="tool-group navigation-tools">
+        <button type="button" class="tool-button" data-command="history-back" title="Previous location">
+          <svg aria-hidden="true"><use href="#icon-back"></use></svg><span>Back</span>
+        </button>
+        <button type="button" class="tool-button" data-command="history-forward" title="Next location">
+          <svg aria-hidden="true"><use href="#icon-forward"></use></svg><span>Forward</span>
+        </button>
+        <button type="button" class="tool-button" data-command="up" data-parent-url="{{ parent_url or '' }}"{% if not parent_url %} disabled{% endif %} title="Parent folder">
+          <svg aria-hidden="true"><use href="#icon-up"></use></svg><span>Up</span>
+        </button>
+      </div>
+      <div class="tool-separator" aria-hidden="true"></div>
+      <div class="tool-group">
+        <button type="button" class="tool-button" data-command="home" title="Shared Files">
+          <svg aria-hidden="true"><use href="#icon-home"></use></svg><span>Home</span>
+        </button>
+        <button type="button" class="tool-button" data-command="reload" title="Reload this folder">
+          <svg aria-hidden="true"><use href="#icon-reload"></use></svg><span>Reload</span>
+        </button>
+        <button type="button" class="tool-button" data-command="upload" title="Choose files to upload">
+          <svg aria-hidden="true"><use href="#icon-upload"></use></svg><span>Upload</span>
+        </button>
+      </div>
+      <div class="tool-spacer"></div>
+      <div class="view-buttons" role="group" aria-label="File view">
+        <button type="button" class="view-button is-active" data-view="details" aria-pressed="true" title="Details view">
+          <svg aria-hidden="true"><use href="#icon-view-details"></use></svg><span class="visually-hidden">Details view</span>
+        </button>
+        <button type="button" class="view-button" data-view="icons" aria-pressed="false" title="Icon view">
+          <svg aria-hidden="true"><use href="#icon-view-icons"></use></svg><span class="visually-hidden">Icon view</span>
+        </button>
+      </div>
     </div>
 
-    <div class="file-list-section">
-      <div class="file-list-header">
-        <h2 class="section-title">Uploaded Files</h2>
-        <div class="sort-controls">
-          <button class="sort-btn" onclick="sortTable(0)" data-sort="name">Name</button>
-          <button class="sort-btn" onclick="sortTable(1)" data-sort="type">Type</button>
-          <button class="sort-btn" onclick="sortTable(2, true)" data-sort="size">Size</button>
+    <div class="location-bar">
+      <span class="location-label">Location:</span>
+      <nav class="breadcrumb-path" aria-label="Current folder">
+        {% for breadcrumb in breadcrumbs %}
+        <a href="{{ breadcrumb.url }}"{% if loop.last %} aria-current="page"{% endif %}>{{ breadcrumb.name }}</a>
+        {% if not loop.last %}<span class="breadcrumb-separator" aria-hidden="true">/</span>{% endif %}
+        {% endfor %}
+      </nav>
+      <label class="search-box" for="fileSearch">
+        <span>Search:</span>
+        <input type="search" id="fileSearch" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+
+    <form method="POST" action="{{ url_for('index') }}" enctype="multipart/form-data" id="uploadForm" class="upload-tray" hidden>
+      <input type="hidden" name="path" value="{{ current_path }}">
+      <input type="file" id="file-input" name="files" multiple>
+      <svg class="upload-tray-icon" aria-hidden="true"><use href="#icon-upload"></use></svg>
+      <p id="fileInfo">No files selected</p>
+      <div class="upload-tray-actions">
+        <button type="button" class="classic-button" id="addMoreFilesButton">Add More…</button>
+        <button type="button" class="classic-button" id="clearFilesButton">Clear</button>
+        <button type="submit" class="classic-button default-button" id="uploadButton" disabled>Upload Here</button>
+      </div>
+    </form>
+
+    <div class="manager-body">
+      <aside class="places-pane" id="placesPane" aria-label="Places and file types">
+        <section class="places-group">
+          <h2>Places</h2>
+          <button type="button" class="place-item is-active" data-filter="all">
+            <svg class="place-icon" aria-hidden="true"><use href="#icon-folder"></use></svg>
+            <span>Current Folder</span>
+            <span class="place-count" data-count-for="all">{{ items|length }}</span>
+          </button>
+          <a class="place-item place-link" href="{{ url_for('index') }}">
+            <svg class="place-icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+            <span>Shared Files</span>
+          </a>
+        </section>
+        <section class="places-group">
+          <h2>File Types</h2>
+          {% for filter_name, label, icon_name in [
+            ('folder', 'Folders', 'folder'),
+            ('document', 'Documents', 'document'),
+            ('spreadsheet', 'Spreadsheets', 'spreadsheet'),
+            ('image', 'Images', 'image'),
+            ('audio', 'Audio', 'audio'),
+            ('video', 'Video', 'video'),
+            ('archive', 'Archives', 'archive'),
+            ('code', 'Code', 'code'),
+            ('other', 'Other', 'other')
+          ] %}
+          <button type="button" class="place-item" data-filter="{{ filter_name }}">
+            <svg class="place-icon" aria-hidden="true"><use href="#icon-{{ 'folder' if icon_name == 'folder' else 'file-' ~ icon_name }}"></use></svg>
+            <span>{{ label }}</span><span class="place-count" data-count-for="{{ filter_name }}">0</span>
+          </button>
+          {% endfor %}
+        </section>
+      </aside>
+
+      <section class="file-pane" id="filePane" data-view="details" aria-label="Files and folders">
+        <div class="mobile-pane-tools">
+          <button type="button" class="classic-button" id="togglePlacesButton" aria-expanded="false" aria-controls="placesPane">Places</button>
+          <label for="mobileSort">Sort:</label>
+          <select id="mobileSort">
+            <option value="name-asc">Name (A–Z)</option>
+            <option value="name-desc">Name (Z–A)</option>
+            <option value="type-asc">Type (A–Z)</option>
+            <option value="type-desc">Type (Z–A)</option>
+            <option value="size-desc">Size (largest)</option>
+            <option value="size-asc">Size (smallest)</option>
+          </select>
+        </div>
+
+        <div class="file-list" id="fileList" role="grid" aria-label="Files and folders" aria-multiselectable="true">
+          <div class="file-list-heading" role="row">
+            <span role="columnheader" class="select-cell"><input type="checkbox" id="selectAllFiles" aria-label="Select all visible items"></span>
+            <button type="button" role="columnheader" class="column-button is-sorted" data-sort="name" data-direction="asc" aria-sort="ascending">Name</button>
+            <button type="button" role="columnheader" class="column-button" data-sort="type" aria-sort="none">Type</button>
+            <button type="button" role="columnheader" class="column-button" data-sort="size" aria-sort="none">Size</button>
+          </div>
+
+          {% for item in items %}
+          <article
+            class="file-row{% if item.kind == 'folder' %} is-folder{% endif %}"
+            role="row"
+            tabindex="{{ '0' if loop.first else '-1' }}"
+            data-name="{{ item.name|lower }}"
+            data-display-name="{{ item.name }}"
+            data-path="{{ item.path }}"
+            data-type="{{ item.type|lower }}"
+            data-size="{{ item.size }}"
+            data-size-bytes="{{ item.size_bytes }}"
+            data-kind="{{ item.kind }}"
+            data-category="{{ item.category }}"
+            data-open-url="{{ item.open_url }}"
+            data-download-url="{{ item.download_url }}"
+            data-delete-url="{{ item.delete_url }}"
+            data-previewable="{{ 'true' if item.is_image else 'false' }}"
+            aria-selected="false"
+          >
+            <span role="cell" class="select-cell"><input class="file-select" type="checkbox" tabindex="-1" aria-label="Select {{ item.name }}"></span>
+            <div role="cell" class="file-identity">
+              {% if item.thumbnail %}
+              <button type="button" class="item-visual thumbnail-button" data-preview-image tabindex="-1" aria-label="Preview {{ item.name }}">
+                <img src="{{ item.open_url }}" alt="" loading="lazy" decoding="async">
+                <svg class="thumbnail-fallback" aria-hidden="true"><use href="#icon-file-image"></use></svg>
+              </button>
+              {% else %}
+              <svg class="item-visual item-icon icon-{{ item.icon }}" aria-hidden="true"><use href="#icon-{{ 'folder' if item.kind == 'folder' else 'file-' ~ item.icon }}"></use></svg>
+              {% endif %}
+              {% if item.kind == 'folder' %}
+              <a href="{{ item.open_url }}" class="file-name folder-link" tabindex="-1" title="Open {{ item.name }}">{{ item.name }}</a>
+              {% else %}
+              <span class="file-name" title="{{ item.name }}">{{ item.name }}</span>
+              {% endif %}
+              <span class="mobile-file-meta">{{ item.type }}{% if item.kind == 'file' %} · {{ item.size }}{% endif %}</span>
+            </div>
+            <span role="cell" class="file-type">{{ item.type }}</span>
+            <span role="cell" class="file-size">{{ item.size }}</span>
+          </article>
+          {% endfor %}
+        </div>
+
+        <div class="empty-state" id="emptyState"{% if items %} hidden{% endif %}>
+          <svg aria-hidden="true"><use href="#icon-folder"></use></svg>
+          <p>This folder is empty.</p>
+        </div>
+      </section>
+
+      <div class="selection-strip" id="selectionBar" hidden>
+        <span id="selectedCount">0 selected</span>
+        <div>
+          <button type="button" class="classic-button selection-action" data-command="open-selected">
+            <svg aria-hidden="true"><use href="#icon-open"></use></svg><span>Open</span>
+          </button>
+          <button type="button" class="classic-button selection-action" data-command="download-selected">
+            <svg aria-hidden="true"><use href="#icon-download"></use></svg><span>Download</span>
+          </button>
+          <button type="button" class="classic-button selection-action danger-selection-action" data-command="delete-selected">
+            <svg aria-hidden="true"><use href="#icon-trash"></use></svg><span>Delete</span>
+          </button>
+          <button type="button" class="classic-button" data-command="clear-selection">Clear</button>
         </div>
       </div>
 
-      <table id="fileTable" style="display: none;">
-        <!-- Hidden table for sorting functionality -->
-        <thead>
-          <tr>
-            <th>File Name</th>
-            <th>Type</th>
-            <th>Size</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for file in files %}
-          <tr>
-            <td>{{ file.name }}</td>
-            <td>{{ file.type }}</td>
-            <td>{{ file.size }}</td>
-            <td>
-              <div class="dropdown">
-                <div class="dropdown-content">
-                  <a href="{{ url_for('download_file', filename=file.name) }}">Download</a>
-                  <a href="{{ url_for('delete_file', filename=file.name) }}">Delete</a>
-                </div>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div class="drop-indicator" id="dropIndicator" hidden>
+        <svg aria-hidden="true"><use href="#icon-upload"></use></svg>
+        <strong>Drop files here to upload into this folder</strong>
+      </div>
+    </div>
 
-      <ul class="file-list" id="fileList">
-        {% for file in files %}
-        <li class="file-item">
-          <div class="file-info">
-            <div class="file-name">{{ file.name }}</div>
-            <div class="file-meta">
-              <span>{{ file.type }}</span>
-              <span>{{ file.size }}</span>
-            </div>
-          </div>
-          <div class="file-actions">
-            <a href="{{ url_for('download_file', filename=file.name) }}" class="action-chip download" title="Download">
-              <span class="label">Download</span>
-            </a>
-            <a href="{{ url_for('delete_file', filename=file.name) }}" class="action-chip delete" title="Delete">
-              <span class="label">Delete</span>
-            </a>
-          </div>
-        </li>
-        {% endfor %}
-      </ul>
+    <footer class="status-bar">
+      <span id="statusText">{{ folder_count }} {{ 'folder' if folder_count == 1 else 'folders' }}, {{ file_count }} {{ 'file' if file_count == 1 else 'files' }}</span>
+      <span class="status-path" title="/{{ current_path or 'Shared Files' }}">/{{ current_path or 'Shared Files' }}</span>
+      <span class="status-message" id="statusMessage" role="status" aria-live="polite">Ready · {{ total_size }}<span class="status-hint"> · right-click for actions</span></span>
+    </footer>
+  </main>
+
+  <div class="context-menu" id="contextMenu" role="menu" aria-label="Actions" tabindex="-1" hidden>
+    <div data-context-group="item">
+      <button type="button" role="menuitem" data-context-command="open">Open</button>
+      <button type="button" role="menuitem" data-context-command="select">Select</button>
+      <button type="button" role="menuitem" data-context-command="download">Download</button>
+      <div class="menu-separator" role="separator"></div>
+      <button type="button" role="menuitem" class="danger-menu-item" data-context-command="delete">Delete…</button>
+    </div>
+    <div data-context-group="pane" hidden>
+      <button type="button" role="menuitem" data-command="upload">Upload Files…</button>
+      <div class="menu-separator" role="separator"></div>
+      <button type="button" role="menuitem" data-command="select-all">Select All</button>
+      <button type="button" role="menuitem" data-command="clear-selection">Clear Selection</button>
+      <div class="menu-separator" role="separator"></div>
+      <button type="button" role="menuitem" data-command="reload">Refresh</button>
     </div>
   </div>
 
-  <div class="drag-overlay" id="dragOverlay">
-    <div class="drag-text">Drop files to upload</div>
-  </div>
+  <form action="{{ url_for('download_selection') }}" method="post" target="downloadTarget" id="batchDownloadForm" hidden></form>
+  <iframe name="downloadTarget" id="downloadTarget" title="Selected file download" hidden></iframe>
 
-  <script>
+  <dialog class="app-dialog" id="messageDialog" aria-labelledby="messageTitle">
+    <header class="dialog-title-bar">
+      <h2 id="messageTitle">Confirm</h2>
+    </header>
+    <p class="dialog-body" id="messageBody"></p>
+    <footer class="dialog-actions">
+      <button type="button" class="classic-button" id="messageCancel" data-dialog-dismiss>Cancel</button>
+      <button type="button" class="classic-button default-button" id="messageConfirm">OK</button>
+    </footer>
+  </dialog>
 
-  </script>
+  <dialog class="preview-dialog" id="imagePreviewDialog" aria-labelledby="previewTitle">
+    <header class="dialog-title-bar">
+      <h2 id="previewTitle">Image Preview</h2>
+      <button type="button" class="dialog-close-button" data-close-preview aria-label="Close preview">
+        <svg aria-hidden="true"><use href="#icon-close"></use></svg>
+      </button>
+    </header>
+    <div class="preview-canvas">
+      <img id="previewImage" alt="">
+      <div class="preview-error" id="previewError" hidden>
+        <svg aria-hidden="true"><use href="#icon-file-image"></use></svg>
+        <p>This image cannot be previewed in this browser.</p>
+      </div>
+    </div>
+    <footer class="dialog-actions">
+      <a class="classic-button dialog-download" id="previewDownload" href="#" download>
+        <svg aria-hidden="true"><use href="#icon-download"></use></svg><span>Download</span>
+      </a>
+      <button type="button" class="classic-button default-button" data-close-preview>Close</button>
+    </footer>
+  </dialog>
 </body>
-
 </html>

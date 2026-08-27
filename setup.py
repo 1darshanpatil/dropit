@@ -22,14 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from setuptools import setup, find_packages
 import os
-import sys
+import re
+
+from setuptools import setup, find_packages
 
 package_dir = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.join(package_dir, 'sharex'))
 
-from dropit import __version__ 
+with open(os.path.join(package_dir, 'dropit', '__init__.py'), encoding='utf-8') as version_file:
+    __version__ = re.search(r'__version__\s*=\s*"([^"]+)"', version_file.read()).group(1)
 
 setup(
     name='dropit',
@@ -37,26 +38,23 @@ setup(
     author='Darshan P.',
     author_email='drshnp@outlook.com',
     description='A Flask-based command line file sharing application.',
-    long_description=open(os.path.join(package_dir, 'README.md')).read(),
+    long_description=open(os.path.join(package_dir, 'README.md'), encoding='utf-8').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/1darshanpatil/dropit',  
+    url='https://github.com/1darshanpatil/dropit',
+    project_urls={
+        'Source': 'https://github.com/1darshanpatil/dropit',
+        'Issue Tracker': 'https://github.com/1darshanpatil/dropit/issues',
+    },
+    license='MIT',
     packages=find_packages(),
     include_package_data=True, 
     install_requires=[
-    'Flask==3.0.3',
-    'Flask-BasicAuth==0.2.0',
-    'qrcode==7.4.2',
-    'click>=8.0.0,<8.2.0',
-    'Werkzeug==3.1.3',
-    'Jinja2==3.1.6',
-    'MarkupSafe==3.0.2',
-    'itsdangerous==2.2.0',
-    'typing_extensions==4.14.1',
-    'blinker==1.9.0',
-    'cryptography==45.0.5',
-    'cffi==1.17.1',
-    'pycparser==2.22',
-    'pypng==0.20220715.0',
+        'Flask>=3.1.1,<4',
+        'Flask-BasicAuth>=0.2.0',
+        'cheroot>=10.0.0',
+        'Werkzeug>=3.1.3,<4',
+        'qrcode>=7.3,<9',
+        'cryptography>=41.0.0',
     ],
     entry_points={
         'console_scripts': [
@@ -64,14 +62,21 @@ setup(
         ]
     },
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
+        'Environment :: Web Environment',
         'Intended Audience :: Developers',
+        'Intended Audience :: End Users/Desktop',
         'License :: OSI Approved :: MIT License',
+        'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Framework :: Flask',
+        'Topic :: Communications :: File Sharing',
+        'Topic :: Internet :: WWW/HTTP :: HTTP Servers',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.9',
 )

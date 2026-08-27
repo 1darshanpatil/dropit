@@ -7,13 +7,14 @@ Dropit is a small Flask app that lets you share files with other devices on the 
 pip install dropit
 ```
 
-Python ≥ 3.6 is supported.
+Python ≥ 3.9 is supported.
 
 ## Commands and flags
 ```
-dropit [--password <password>] [--geturl] [--getqr] [--maxsize <GB>] [--version]
+dropit [--password <password>] [--geturl] [--getqr] [--maxsize <GB>] [--http] [--version]
 ```
 - `--password <password>`: enable Basic Auth with username `admin`.
+- `--http`: serve plain HTTP instead of HTTPS — no certificate warning, but traffic is unencrypted.
 - `--geturl`: print the server URL in color to the terminal.
 - `--getqr`: render the URL as an ASCII QR code in the terminal.
 - `--maxsize <GB>`: maximum upload size in gigabytes (default: `2`).
@@ -35,35 +36,92 @@ dropit --maxsize 10
 
 # just show the installed version
 dropit --version
+
+# no certificate warning (unencrypted — trusted networks only)
+dropit --http
 ```
 
 ## Quick start
 ```bash
 dropit --geturl
 ```
-Then, from another device on the same network, open the URL shown (e.g., `https://<your-ip>:5001`). Because the certificate is self-signed, your browser will show a warning; proceed/accept for your local session.
+Then, from another device on the same network, open the URL shown (e.g., `https://<your-ip>:5001`).
 
 ## What you get
-- Local HTTPS server on port `5001` (self-signed cert generated on the fly).
-- Drag-and-drop upload UI with file list (type/size) plus download/delete actions.
+- Local HTTPS server on port `5001`, with a certificate that is reused across restarts.
+- A file-manager UI: folders, breadcrumbs, search, type filters, details/icon views, image previews.
+- Drag-and-drop upload, multi-file download as a ZIP, and delete.
 - Optional Basic Auth: set a password and use the fixed username `admin`.
 - Handy discovery: print the URL (`--geturl`) and an ASCII QR code (`--getqr`).
 - Upload size limit configurable via `--maxsize` (default 2 GB).
 - Files are stored under your home directory in `sharex` (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows). The exact resolved path is printed on startup.
+- A keep-alive HTTP server (cheroot) with a worker pool, so several devices can browse while
+  others download.
+
+## Certificates and the browser warning
+Dropit serves HTTPS with a self-signed certificate stored at `~/.dropit/cert.pem`. It is
+generated once, covers `localhost`, your machine's hostname, and your current LAN IP, and is
+**reused on every restart** — so a device only has to be told to trust it once, rather than on
+every run.
+
+Three ways to deal with the warning, in order of least friction:
+
+1. **Accept it per device.** Tap through the browser's "advanced → proceed" prompt. Because the
+   certificate no longer changes between runs, most browsers stop asking after the first time.
+2. **Install the certificate as trusted.** Copy `~/.dropit/cert.pem` to the device and install it
+   (Android: *Settings → Security → Encryption & credentials → Install a certificate → CA
+   certificate*; iOS: open the file, then *Settings → General → About → Certificate Trust
+   Settings*; macOS: add it to Keychain Access and mark it *Always Trust*). The warning is then
+   gone for good.
+3. **Skip TLS entirely** with `dropit --http` for devices that refuse self-signed certificates.
+   There is no warning at all, but everything — including your `--password` credentials — travels
+   the network in the clear, so only do this on a network you trust.
+
+Dropit regenerates the certificate automatically if your LAN IP changes or it is about to expire.
 
 ## Using the web UI
-- Upload: drag files into the drop zone or click to choose files, then hit **Upload Files**.
-- Download/Delete: use the action chips next to each file in the list.
-- Storage: uploaded files are saved to `sharex` under your home directory (`$HOME/sharex` on Linux/macOS, `%USERPROFILE%\\sharex` on Windows).
+- **Actions**: right-click an item (long-press on a phone or tablet) to get **Open**, **Select**,
+  **Download**, and **Delete**. Right-clicking empty space in the list offers **Upload Files**,
+  **Select All**, **Clear Selection**, and **Refresh**.
+- **Selecting**: a plain click never selects, so you can browse without disturbing a selection.
+  Use the row checkbox, the context menu's **Select**, `Ctrl`/`Cmd`-click to add one item, or
+  `Shift`-click to extend a range. `Ctrl`/`Cmd`+`A` selects everything currently shown.
+- **Opening**: double-click a row, or press `Enter` on the focused row. Folders open in place;
+  images open in a preview dialog.
+- **Downloading**: one selected file downloads directly; several are streamed as a single ZIP.
+- **Upload**: drag files anywhere onto the page, or use **Upload** in the toolbar, then
+  **Upload Here**. Uploads land in the folder you are currently viewing and never overwrite an
+  existing file — a duplicate name is saved as `name (1).ext`.
+- **Deleting**: folders must be empty before they can be removed.
+- **Storage**: uploaded files are saved to `sharex` under your home directory (`$HOME/sharex` on
+  Linux/macOS, `%USERPROFILE%\\sharex` on Windows).
+
+### Keyboard
+| Key | Action |
+| --- | --- |
+| `↑` `↓` `Home` `End` | Move between rows |
+| `Space` | Toggle selection of the focused row |
+| `Enter` | Open the focused row |
+| `Ctrl`/`Cmd` + `A` | Select everything shown |
+| `Ctrl`/`Cmd` + `F` | Jump to the search box |
+| `Shift` + `F10` / Menu key | Open the context menu for the focused row |
+| `Esc` | Close menus, the preview, or the Places panel |
 
 ## Authentication
 - Default: open access.
 - To require a password: start with `--password mysecret`. Sign in as `admin` with that password. Basic Auth is only enforced when a password is provided.
 
+> **Anyone on your network can read, upload to, and delete from the shared folder** while the
+> server is running. Without `--password` there is no access control at all, so start it only on
+> networks you trust and keep private files out of `~/sharex`.
+
 ## Troubleshooting
-- **Browser warning about HTTPS**: the app uses an ad-hoc self-signed cert; choose “proceed” for your local session.
+- **Browser warning about HTTPS**: see [Certificates and the browser warning](#certificates-and-the-browser-warning). Quickest escape hatch is `dropit --http`.
+- **A device refuses to open the page at all**: some Android builds will not let you past a self-signed certificate. Use `dropit --http`, or install the certificate as trusted.
+- **Slow with several devices connected**: make sure you are on the release that uses the keep-alive server; large images are also served as icons rather than thumbnails past 2 MB.
 - **Can’t reach the URL**: ensure devices are on the same network and that port `5001` is allowed through firewalls.
 - **Upload fails due to size**: increase `--maxsize` to the number of gigabytes you need.
+- **Port 5001 is already in use**: stop the other program using it, then start Dropit again.
 
 ## Contributing
 Issues and pull requests are welcome. For significant changes, please open an issue first to discuss what you’d like to adjust.
