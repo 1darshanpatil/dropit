@@ -272,6 +272,16 @@
         </div>
       </div>
 
+      <div class="transfer-tray" id="transferTray" hidden aria-live="polite">
+        <div class="transfer-head">
+          <svg aria-hidden="true"><use href="#icon-download"></use></svg>
+          <strong id="transferName">Preparing…</strong>
+          <button type="button" class="classic-button" id="transferDismiss">Hide</button>
+        </div>
+        <div class="transfer-track"><div class="transfer-fill" id="transferFill"></div></div>
+        <span class="transfer-detail" id="transferDetail">Starting…</span>
+      </div>
+
       <div class="drop-indicator" id="dropIndicator" hidden>
         <svg aria-hidden="true"><use href="#icon-upload"></use></svg>
         <strong>Drop files here to upload into this folder</strong>

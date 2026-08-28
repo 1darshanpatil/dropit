@@ -68,11 +68,17 @@ Three ways to deal with the warning, in order of least friction:
 
 1. **Accept it per device.** Tap through the browser's "advanced → proceed" prompt. Because the
    certificate no longer changes between runs, most browsers stop asking after the first time.
-2. **Install the certificate as trusted.** Copy `~/.dropit/cert.pem` to the device and install it
+2. **Install the certificate as trusted.** Open **`https://<your-ip>:5001/certificate`** on the
+   device — that downloads the certificate and starts the system install flow. Then finish it
    (Android: *Settings → Security → Encryption & credentials → Install a certificate → CA
-   certificate*; iOS: open the file, then *Settings → General → About → Certificate Trust
-   Settings*; macOS: add it to Keychain Access and mark it *Always Trust*). The warning is then
-   gone for good.
+   certificate*; iOS: *Settings → General → VPN & Device Management* to install, then *General →
+   About → Certificate Trust Settings* to enable full trust; macOS: open it in Keychain Access
+   and mark it *Always Trust*). The warning is then gone for good.
+
+   **This is the fix if downloads fail.** A phone's download manager is a separate component
+   from the browser and does not inherit the "proceed anyway" exception you tapped through, so
+   it rejects the certificate on its own and the transfer dies. Dropit prints a hint the first
+   time it sees this.
 3. **Skip TLS entirely** with `dropit --http` for devices that refuse self-signed certificates.
    There is no warning at all, but everything — including your `--password` credentials — travels
    the network in the clear, so only do this on a network you trust.
@@ -88,7 +94,11 @@ Dropit regenerates the certificate automatically if your LAN IP changes or it is
   `Shift`-click to extend a range. `Ctrl`/`Cmd`+`A` selects everything currently shown.
 - **Opening**: double-click a row, or press `Enter` on the focused row. Folders open in place;
   images open in a preview dialog.
-- **Downloading**: one selected file downloads directly; several are streamed as a single ZIP.
+- **Downloading**: one selected file downloads directly; several items — or a whole folder —
+  stream as a single ZIP that keeps the folder structure. Folders are walked recursively.
+  Nothing is staged on disk first, so even a multi-gigabyte folder starts immediately.
+- **Progress**: a tray in the bottom corner shows bytes transferred, percentage, speed, and
+  time remaining, because the browser's own download manager is invisible to the page.
 - **Upload**: drag files anywhere onto the page, or use **Upload** in the toolbar, then
   **Upload Here**. Uploads land in the folder you are currently viewing and never overwrite an
   existing file — a duplicate name is saved as `name (1).ext`.
@@ -119,6 +129,8 @@ Dropit regenerates the certificate automatically if your LAN IP changes or it is
 - **Browser warning about HTTPS**: see [Certificates and the browser warning](#certificates-and-the-browser-warning). Quickest escape hatch is `dropit --http`.
 - **A device refuses to open the page at all**: some Android builds will not let you past a self-signed certificate. Use `dropit --http`, or install the certificate as trusted.
 - **Slow with several devices connected**: make sure you are on the release that uses the keep-alive server; large images are also served as icons rather than thumbnails past 2 MB.
+- **Downloads start then fail on a phone**: the download manager is rejecting the self-signed certificate. Install it from `/certificate`, or use `--http`.
+- **`certificate unknown` in the console**: same cause — a device has not been told to trust the certificate. Dropit prints the fix once rather than repeating the alert.
 - **Can’t reach the URL**: ensure devices are on the same network and that port `5001` is allowed through firewalls.
 - **Upload fails due to size**: increase `--maxsize` to the number of gigabytes you need.
 - **Port 5001 is already in use**: stop the other program using it, then start Dropit again.

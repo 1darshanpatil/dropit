@@ -28,6 +28,7 @@ SOFTWARE.
 import os
 import errno
 import ipaddress
+import threading
 import socket
 import argparse
 import datetime
@@ -35,7 +36,7 @@ import tempfile
 import time
 import zipfile
 from functools import wraps
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import qrcode
 from flask import Flask, request, render_template, redirect, url_for, send_from_directory, abort, jsonify, Response
@@ -60,6 +61,165 @@ CERTIFICATE_DAYS = 825  # The longest lifetime Apple and Chrome will accept for 
 # Past this size that costs more than it is worth over Wi-Fi, so show the icon instead;
 # the image still opens at full size in the preview.
 THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024
+
+# Streamed archives are stored, not deflated: the shared files are usually already
+# compressed (HEIC, PNG, PDF, MP4), so deflate burns CPU for almost no saving — and
+# storing lets us predict the archive size to the byte, which is what gives the browser
+# a real progress bar instead of "unknown size".
+ZIP_ENTRY_OVERHEAD = 120  # local header + data descriptor + central directory, with ZIP64
+ZIP_TRAILER_OVERHEAD = 22  # end-of-central-directory record
+STREAM_CHUNK_BYTES = 512 * 1024
+
+# Byte counters for in-flight downloads, keyed by a token the browser generates.
+# Shared across worker threads, so every touch goes through the lock.
+_download_progress = {}
+_download_progress_lock = threading.Lock()
+DOWNLOAD_PROGRESS_TTL = 120
+
+
+def _progress_start(token, total, label):
+    if not token:
+        return
+    with _download_progress_lock:
+        _prune_progress()
+        _download_progress[token] = {
+            'sent': 0, 'total': total, 'label': label,
+            'done': False, 'failed': False, 'updated': time.monotonic(),
+        }
+
+
+def _progress_advance(token, sent):
+    if not token:
+        return
+    with _download_progress_lock:
+        entry = _download_progress.get(token)
+        if entry is not None:
+            entry['sent'] = sent
+            entry['updated'] = time.monotonic()
+
+
+def _progress_finish(token, failed=False):
+    if not token:
+        return
+    with _download_progress_lock:
+        entry = _download_progress.get(token)
+        if entry is not None:
+            entry['done'] = True
+            entry['failed'] = failed
+            entry['updated'] = time.monotonic()
+
+
+def _prune_progress():
+    """Drop finished or abandoned entries. Caller already holds the lock."""
+    cutoff = time.monotonic() - DOWNLOAD_PROGRESS_TTL
+    for key in [k for k, v in _download_progress.items() if v['updated'] < cutoff]:
+        del _download_progress[key]
+
+
+def collect_download_entries(selected_paths):
+    """Expand a selection of files and folders into a flat list of archive entries.
+
+    Folders are walked recursively; symlinks and half-finished uploads are skipped so a
+    download can never escape the share root or capture a partial file.
+    """
+    entries = []
+    seen = set()
+
+    def add_file(disk_path, arcname):
+        if arcname in seen:
+            return
+        try:
+            stat_result = os.stat(disk_path, follow_symlinks=False)
+        except OSError:
+            return
+        seen.add(arcname)
+        entries.append((disk_path, arcname, stat_result.st_size))
+
+    for selected_path in selected_paths:
+        disk_path, normalized_path = resolve_shared_path(selected_path)
+        if not normalized_path:
+            continue
+
+        if os.path.isdir(disk_path) and not os.path.islink(disk_path):
+            for directory, subdirectories, filenames in os.walk(disk_path, followlinks=False):
+                subdirectories[:] = [
+                    name for name in subdirectories
+                    if not os.path.islink(os.path.join(directory, name))
+                ]
+                relative_directory = os.path.relpath(directory, disk_path)
+                for filename in filenames:
+                    full_path = os.path.join(directory, filename)
+                    if os.path.islink(full_path):
+                        continue
+                    if filename.startswith('.__dropit_upload_') and filename.endswith('.part'):
+                        continue
+                    relative = filename if relative_directory == '.' else os.path.join(relative_directory, filename)
+                    add_file(full_path, f"{normalized_path}/{relative}".replace(os.sep, '/'))
+        elif os.path.isfile(disk_path):
+            add_file(disk_path, normalized_path)
+        else:
+            abort(404)
+
+    return entries
+
+
+def archive_size(entries):
+    """Exact byte length of the archive stream_archive() will produce."""
+    payload = sum(size for _, _, size in entries)
+    names = sum(len(arcname.encode('utf-8')) for _, arcname, _ in entries)
+    return payload + 2 * names + ZIP_ENTRY_OVERHEAD * len(entries) + ZIP_TRAILER_OVERHEAD
+
+
+def content_disposition(filename):
+    """Build an attachment header that survives spaces, quotes, and non-ASCII names.
+
+    Plain ASCII goes in the quoted form every client understands; the RFC 5987
+    ``filename*`` form carries the real name for anything with an em dash or CJK in it.
+    """
+    fallback = ''.join(character if 32 <= ord(character) < 127 and character not in '"\\'
+                       else '_' for character in filename) or 'download'
+    encoded = quote(filename, safe='')
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
+
+
+def suggested_archive_name(selected_paths, entries):
+    """Name the ZIP after the folder when there is exactly one, otherwise generically."""
+    if len(selected_paths) == 1:
+        base = os.path.basename(selected_paths[0].replace('\\', '/').rstrip('/'))
+        if base:
+            return f'{base}.zip'
+    return f'dropit-{len(entries)}-files.zip'
+
+
+class _ChunkSink:
+    """Collects what zipfile writes so the generator can hand it straight to the socket.
+
+    Reporting seekable() as False makes zipfile emit data descriptors, which is what lets
+    the archive be produced in one pass without ever knowing a file's CRC in advance.
+    """
+
+    def __init__(self):
+        self.chunks = []
+        self.position = 0
+
+    def write(self, data):
+        data = bytes(data)
+        self.chunks.append(data)
+        self.position += len(data)
+        return len(data)
+
+    def drain(self):
+        chunks, self.chunks = self.chunks, []
+        return chunks
+
+    def flush(self):
+        pass
+
+    def seekable(self):
+        return False
+
+    def tell(self):
+        return self.position
 
 
 def positive_gigabytes(value):
@@ -466,79 +626,147 @@ def download_file(filename):
 @app.route('/download-selection', methods=['POST'])
 @optional_auth
 def download_selection():
-    """Download one selected file directly or several files in a temporary ZIP."""
+    """Stream the selected files and folders, as one file or as a ZIP.
+
+    Nothing is staged on disk first: the archive is produced while it is being sent, so a
+    multi-gigabyte folder starts downloading immediately instead of after a long silence.
+    """
     selected_paths = request.form.getlist('paths')
-    resolved_files = []
-    seen_paths = set()
+    token = (request.form.get('token') or '').strip()[:64]
+    entries = collect_download_entries(selected_paths)
 
-    for selected_path in selected_paths:
-        file_path, normalized_path = resolve_shared_path(selected_path)
-        if not normalized_path or normalized_path in seen_paths:
-            continue
-        if not os.path.isfile(file_path):
-            abort(404)
-
-        seen_paths.add(normalized_path)
-        resolved_files.append((file_path, normalized_path))
-
-    if not resolved_files:
+    if not entries:
         abort(400)
 
-    if len(resolved_files) == 1:
-        return send_from_directory(
-            app.config['UPLOAD_FOLDER'],
-            resolved_files[0][1],
-            as_attachment=True,
+    if len(entries) == 1 and len(selected_paths) == 1 and os.path.isfile(
+            resolve_shared_path(selected_paths[0])[0]):
+        disk_path, arcname, size = entries[0]
+        download_name = os.path.basename(arcname)
+        _progress_start(token, size, download_name)
+
+        def stream_file():
+            sent = 0
+            try:
+                with open(disk_path, 'rb') as source:
+                    while True:
+                        chunk = source.read(STREAM_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        sent += len(chunk)
+                        _progress_advance(token, sent)
+                        yield chunk
+            except GeneratorExit:
+                _progress_finish(token, failed=True)
+                raise
+            except OSError:
+                _progress_finish(token, failed=True)
+                raise
+            else:
+                _progress_finish(token)
+
+        return Response(
+            stream_file(),
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Length': str(size),
+                'Content-Disposition': content_disposition(download_name),
+            },
         )
 
-    descriptor, archive_path = tempfile.mkstemp(prefix='dropit-selection-', suffix='.zip')
-    os.close(descriptor)
-
-    try:
-        with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
-            for file_path, normalized_path in resolved_files:
-                archive.write(file_path, arcname=normalized_path)
-        archive_size = os.path.getsize(archive_path)
-    except OSError:
-        try:
-            os.remove(archive_path)
-        except OSError:
-            pass
-        abort(409)
-    except Exception:
-        try:
-            os.remove(archive_path)
-        except OSError:
-            pass
-        raise
-
-    def remove_archive():
-        try:
-            os.remove(archive_path)
-        except OSError:
-            pass
+    archive_name = suggested_archive_name(selected_paths, entries)
+    total = archive_size(entries)
+    _progress_start(token, total, archive_name)
 
     def stream_archive():
+        sink = _ChunkSink()
+        sent = 0
         try:
-            with open(archive_path, 'rb') as archive_file:
-                while True:
-                    chunk = archive_file.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    yield chunk
-        finally:
-            remove_archive()
+            with zipfile.ZipFile(sink, 'w', compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
+                for disk_path, arcname, size in entries:
+                    info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+                    info.compress_type = zipfile.ZIP_STORED
+                    info.file_size = size
+                    # force_zip64 keeps every entry's header the same shape, which is what
+                    # makes archive_size() exact and removes the 4 GB per-file ceiling.
+                    with archive.open(info, 'w', force_zip64=True) as destination:
+                        with open(disk_path, 'rb') as source:
+                            remaining = size
+                            while remaining > 0:
+                                chunk = source.read(min(STREAM_CHUNK_BYTES, remaining))
+                                if not chunk:
+                                    # File shrank mid-read; pad so the length still matches
+                                    # the Content-Length we already promised the client.
+                                    chunk = b'\0' * remaining
+                                destination.write(chunk)
+                                remaining -= len(chunk)
+                                for piece in sink.drain():
+                                    sent += len(piece)
+                                    _progress_advance(token, sent)
+                                    yield piece
+                    for piece in sink.drain():
+                        sent += len(piece)
+                        _progress_advance(token, sent)
+                        yield piece
+            for piece in sink.drain():
+                sent += len(piece)
+                _progress_advance(token, sent)
+                yield piece
+        except GeneratorExit:
+            _progress_finish(token, failed=True)
+            raise
+        except OSError:
+            _progress_finish(token, failed=True)
+            raise
+        else:
+            _progress_finish(token)
 
-    response = Response(
+    return Response(
         stream_archive(),
         mimetype='application/zip',
         headers={
-            'Content-Disposition': 'attachment; filename="selected-files.zip"',
-            'Content-Length': str(archive_size),
+            'Content-Length': str(total),
+            'Content-Disposition': content_disposition(archive_name),
         },
     )
-    response.call_on_close(remove_archive)
-    return response
+
+
+@app.route('/certificate')
+@optional_auth
+def certificate_download():
+    """Hand out the server certificate so a device can trust it permanently.
+
+    Tapping this on Android or iOS starts the system's certificate install flow, which is
+    the only way to stop the browser warning for good.
+    """
+    if not os.path.isfile(CERTIFICATE_PATH):
+        abort(404)
+    with open(CERTIFICATE_PATH, 'rb') as cert_file:
+        body = cert_file.read()
+    return Response(
+        body,
+        mimetype='application/x-x509-ca-cert',
+        headers={
+            'Content-Length': str(len(body)),
+            'Content-Disposition': content_disposition('dropit-certificate.crt'),
+        },
+    )
+
+
+@app.route('/download-progress/<token>')
+@optional_auth
+def download_progress(token):
+    """Report how much of an in-flight download has been written."""
+    with _download_progress_lock:
+        entry = _download_progress.get(token)
+        snapshot = dict(entry) if entry else None
+
+    if snapshot is None:
+        return jsonify({'known': False})
+
+    snapshot.pop('updated', None)
+    snapshot['known'] = True
+    return jsonify(snapshot)
+
 
 @app.route('/delete/<path:filename>', methods=['POST'])
 @optional_auth
@@ -799,6 +1027,34 @@ class AccessLog:
         return self.application(environ, logging_start_response)
 
 
+def quiet_rejected_certificate_logs(server, port):
+    """Replace repeated 'certificate unknown' handshake noise with one actionable hint.
+
+    A device that has not been told to trust the certificate aborts the TLS handshake on
+    every speculative connection it opens, which floods the console. The download managers
+    on iOS and Android are the worst offenders: they do not inherit the "proceed anyway"
+    exception the browser got, so they reject on their own and the download quietly fails.
+    """
+    warned = threading.Event()
+    original = server.error_log
+
+    def error_log(message='', level=20, traceback=False):
+        if 'CERTIFICATE_UNKNOWN' in message or 'certificate unknown' in message:
+            if not warned.is_set():
+                warned.set()
+                print(print_colored(
+                    'A device rejected the certificate. Downloads often fail this way, because '
+                    'phone download managers do not inherit the browser\'s "proceed anyway".',
+                    'yellow'))
+                print(print_colored(
+                    f'  Fix it for good: open https://<this-machine>:{port}/certificate on the '
+                    f'device and install it, or restart with --http.', 'yellow'))
+            return
+        return original(message, level, traceback)
+
+    server.error_log = error_log
+
+
 def serve_forever(wsgi_app, host, port, ssl_files=None, threads=DEFAULT_WORKER_THREADS):
     """Run the app on a threaded, keep-alive capable server.
 
@@ -822,6 +1078,7 @@ def serve_forever(wsgi_app, host, port, ssl_files=None, threads=DEFAULT_WORKER_T
         from cheroot.ssl.builtin import BuiltinSSLAdapter
 
         server.ssl_adapter = BuiltinSSLAdapter(*ssl_files)
+        quiet_rejected_certificate_logs(server, port)
 
     try:
         server.safe_start()
@@ -868,8 +1125,10 @@ def run_app():
     print(print_colored(f"Files are stored in: {upload_folder} (from {home_hint})", "blue"))
     if ssl_files:
         print(print_colored(
-            f"Certificate: {CERTIFICATE_PATH} (reused across restarts — trust it once per device "
-            f"to stop the browser warning)", "cyan"))
+            f"Certificate: {CERTIFICATE_PATH} (reused across restarts)", "cyan"))
+        print(print_colored(
+            f"To stop the warning for good, open {server_url}/certificate on each device "
+            f"and install it.", "cyan"))
     else:
         print(print_colored(
             "Serving plain HTTP: traffic is unencrypted and visible to others on this network.",

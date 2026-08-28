@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewError = document.getElementById('previewError');
     const previewDownload = document.getElementById('previewDownload');
     const batchDownloadForm = document.getElementById('batchDownloadForm');
+    const transferTray = document.getElementById('transferTray');
+    const transferName = document.getElementById('transferName');
+    const transferFill = document.getElementById('transferFill');
+    const transferDetail = document.getElementById('transferDetail');
+    const transferDismiss = document.getElementById('transferDismiss');
     const messageDialog = document.getElementById('messageDialog');
     const messageTitle = document.getElementById('messageTitle');
     const messageBody = document.getElementById('messageBody');
@@ -63,6 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bytesFromSize = (row) => Number.parseInt(row.dataset.sizeBytes, 10) || 0;
 
+    const formatDuration = (seconds) => {
+        if (!Number.isFinite(seconds) || seconds < 0) return '—';
+        if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ${Math.round(seconds % 60)}s`;
+        return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+    };
+
     const formatBytes = (bytes) => {
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -72,7 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const visibleRows = () => Array.from(fileList.querySelectorAll('.file-row')).filter((row) => !row.hidden);
     const selectedRows = () => visibleRows().filter((row) => row.querySelector('.file-select').checked);
-    const selectedFiles = () => selectedRows().filter((row) => row.dataset.kind === 'file');
+    // Folders download as a ZIP of their contents, so everything selected is downloadable.
+    const selectedFiles = () => selectedRows();
 
     const focusRow = (row) => {
         if (!row) return;
@@ -383,21 +397,112 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.assign(row.dataset.openUrl);
     };
 
-    const downloadRows = (rowsToDownload) => {
-        const files = rowsToDownload.filter((row) => row.dataset.kind === 'file');
-        if (!files.length) return;
+    // The browser hands a download to its own manager, which the page cannot see into.
+    // The server counts the bytes it has written instead, and we poll that.
+    let transferPoll = null;
 
+    const stopTransferPoll = () => {
+        if (transferPoll === null) return;
+        window.clearInterval(transferPoll);
+        transferPoll = null;
+    };
+
+    const watchTransfer = (token, label) => {
+        stopTransferPoll();
+        transferTray.hidden = false;
+        transferTray.classList.remove('is-done', 'is-failed');
+        transferName.textContent = label;
+        transferFill.style.width = '0%';
+        transferDetail.textContent = 'Preparing…';
+
+        const startedAt = performance.now();
+        let missing = 0;
+
+        const tick = async () => {
+            let report;
+            try {
+                const response = await fetch(`download-progress/${encodeURIComponent(token)}`,
+                    { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                report = await response.json();
+            } catch (_error) {
+                return;
+            }
+
+            if (!report.known) {
+                // The request may not have reached a worker yet; give it a few rounds.
+                missing += 1;
+                if (missing > 12) {
+                    stopTransferPoll();
+                    transferDetail.textContent = 'Handed to your browser\u2019s downloads.';
+                    transferFill.style.width = '100%';
+                    transferTray.classList.add('is-done');
+                }
+                return;
+            }
+
+            missing = 0;
+            const total = report.total || 0;
+            const percent = total ? Math.min(100, (report.sent / total) * 100) : 0;
+            transferFill.style.width = `${percent}%`;
+
+            const seconds = (performance.now() - startedAt) / 1000;
+            const rate = seconds > 0.4 ? report.sent / seconds : 0;
+            const speed = rate ? ` · ${formatBytes(rate)}/s` : '';
+            const remaining = rate && total > report.sent
+                ? ` · ${formatDuration((total - report.sent) / rate)} left`
+                : '';
+
+            if (report.failed) {
+                stopTransferPoll();
+                transferTray.classList.add('is-failed');
+                transferDetail.textContent = 'Transfer stopped before it finished.';
+                setStatus('Download interrupted');
+                return;
+            }
+
+            if (report.done) {
+                stopTransferPoll();
+                transferTray.classList.add('is-done');
+                transferFill.style.width = '100%';
+                transferDetail.textContent = `${formatBytes(total)} sent in ${formatDuration(seconds)}`;
+                setStatus(`Finished sending ${report.label || 'download'}`);
+                return;
+            }
+
+            transferDetail.textContent =
+                `${formatBytes(report.sent)} of ${formatBytes(total)} (${percent.toFixed(0)}%)${speed}${remaining}`;
+        };
+
+        tick();
+        transferPoll = window.setInterval(tick, 400);
+    };
+
+    const downloadRows = (rowsToDownload) => {
+        const targets = rowsToDownload.filter(Boolean);
+        if (!targets.length) return;
+
+        const token = (window.crypto?.randomUUID?.() || String(Date.now() + Math.random()));
         batchDownloadForm.replaceChildren();
-        files.forEach((row) => {
+        targets.forEach((row) => {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'paths';
             input.value = row.dataset.path;
             batchDownloadForm.appendChild(input);
         });
+        const tokenField = document.createElement('input');
+        tokenField.type = 'hidden';
+        tokenField.name = 'token';
+        tokenField.value = token;
+        batchDownloadForm.appendChild(tokenField);
         HTMLFormElement.prototype.submit.call(batchDownloadForm);
 
-        setStatus(files.length === 1 ? 'Downloading selected file…' : `Preparing ${pluralize(files.length, 'file')} as a ZIP…`);
+        const folders = targets.filter((row) => row.dataset.kind === 'folder').length;
+        const label = targets.length === 1
+            ? targets[0].dataset.displayName
+            : `${pluralize(targets.length, 'item')}`;
+        watchTransfer(token, folders || targets.length > 1 ? `${label} (ZIP)` : label);
+        setStatus(`Downloading ${label}…`);
     };
 
     const refreshFolderTotals = () => {
@@ -509,18 +614,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (contextRow) {
             const targets = contextTargets();
-            const files = targets.filter((item) => item.dataset.kind === 'file');
             const many = targets.length > 1;
+            const isFolder = contextRow.dataset.kind === 'folder';
             const allSelected = targets.every((item) => item.querySelector('.file-select').checked);
             const label = many ? ` ${pluralize(targets.length, 'item')}` : '';
 
             contextOpenItem.hidden = many;
-            contextOpenItem.textContent = contextRow.dataset.kind === 'folder' ? 'Open Folder' : 'Open';
+            contextOpenItem.textContent = isFolder ? 'Open Folder' : 'Open';
             contextSelectItem.textContent = `${allSelected ? 'Deselect' : 'Select'}${label}`;
-            contextDownloadItem.textContent = files.length > 1
-                ? `Download ${pluralize(files.length, 'file')} (ZIP)`
-                : 'Download';
-            contextDownloadItem.disabled = files.length === 0;
+            // A folder downloads as a ZIP of everything inside it, so it is never disabled.
+            contextDownloadItem.textContent = many
+                ? `Download ${pluralize(targets.length, 'item')} (ZIP)`
+                : (isFolder ? 'Download Folder (ZIP)' : 'Download');
+            contextDownloadItem.disabled = targets.length === 0;
             contextDeleteItem.textContent = `Delete${label}…`;
         }
 
@@ -950,6 +1056,11 @@ document.addEventListener('DOMContentLoaded', () => {
         dragDepth = 0;
         dropIndicator.hidden = true;
         replaceQueuedFiles([...queuedFiles, ...Array.from(event.dataTransfer.files)]);
+    });
+
+    transferDismiss.addEventListener('click', () => {
+        stopTransferPoll();
+        transferTray.hidden = true;
     });
 
     document.querySelectorAll('[data-close-preview]').forEach((button) => button.addEventListener('click', closeImagePreview));

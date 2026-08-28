@@ -924,6 +924,72 @@ input[type="checkbox"] {
     display: none;
 }
 
+.transfer-tray {
+    position: absolute;
+    z-index: 17;
+    right: 14px;
+    bottom: 14px;
+    left: auto;
+    display: grid;
+    width: min(360px, calc(100% - 28px));
+    gap: 7px;
+    border: 1px solid var(--border-dark);
+    padding: 9px 11px;
+    background: var(--chrome-light);
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.26);
+}
+
+.selection-strip:not([hidden]) ~ .transfer-tray {
+    bottom: 62px;
+}
+
+.transfer-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.transfer-head svg {
+    width: 17px;
+    height: 17px;
+    flex: none;
+}
+
+.transfer-head strong {
+    min-width: 0;
+    overflow: hidden;
+    flex: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.transfer-track {
+    height: 12px;
+    border: 1px solid var(--border-dark);
+    background: #fff;
+}
+
+.transfer-fill {
+    width: 0;
+    height: 100%;
+    background: var(--blue);
+    transition: width 0.18s linear;
+}
+
+.transfer-tray.is-done .transfer-fill {
+    background: #4e9a06;
+}
+
+.transfer-tray.is-failed .transfer-fill {
+    background: var(--danger);
+}
+
+.transfer-detail {
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
 .drop-indicator {
     position: absolute;
     z-index: 20;
@@ -1315,6 +1381,17 @@ input[type="checkbox"] {
     .mobile-pane-tools select {
         width: min(48vw, 190px);
         flex: 0 1 auto;
+    }
+
+    .transfer-tray {
+        right: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: auto;
+    }
+
+    .selection-strip:not([hidden]) ~ .transfer-tray {
+        bottom: 8px;
     }
 
     .selection-strip {
