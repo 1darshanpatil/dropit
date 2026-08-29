@@ -2,6 +2,8 @@
 
 Dropit is a small Flask app that lets you share files with other devices on the same network. It runs a local HTTPS server with a drag-and-drop UI for uploading, downloading, and deleting files.
 
+![The Dropit web UI in icon view: a sidebar counting files by type, a grid of file icons, an open right-click menu offering Open, Select, Download and Delete, and a transfer tray reporting a finished download](https://raw.githubusercontent.com/1darshanpatil/dropit/master/docs/screenshot.png)
+
 ## Install
 ```bash
 pip install dropit
@@ -147,5 +149,8 @@ Issues and pull requests are welcome. For significant changes, please open an is
   - `dropit --version` (standalone; prints the version and exits)
   - `dropit --geturl` or `dropit --getqr` (separate run; starts the server and prints URL or QR, shows the resolved storage path)
 - Push your branch and open a PR against `master` with a short description and verification steps.
-- Releases: bump `dropit/__version__`, tag `vX.Y.Z`, and push the tag to trigger the publish workflow.
+- Releases are driven by the version, not by tags. Bump `__version__` in `dropit/__init__.py`
+  in your PR; when it merges to `master`, CI builds, smoke-tests the wheel in a clean
+  environment, publishes to PyPI, and creates the `vX.Y.Z` tag for you. Merging without
+  bumping the version publishes nothing, so ordinary PRs are safe.
 - For larger contributions: discuss design/approach in an issue first, keep PRs focused, and add tests/docs alongside code changes so reviewers can validate quickly.

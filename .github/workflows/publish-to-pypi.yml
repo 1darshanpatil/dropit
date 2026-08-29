@@ -1,9 +1,13 @@
 name: Publish to PyPI
 
+# Publishing is driven by the version in dropit/__init__.py, not by pushing a tag.
+# Merge to master with a bumped version and the release goes out; merge without
+# bumping it and the workflow stops after the version check. The tag is created
+# afterwards, from the version that was actually published.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
@@ -14,7 +18,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  version:
+    name: Decide whether this version is new
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      should_publish: ${{ steps.check.outputs.should_publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read the package version and compare it with PyPI
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(python - <<'PY'
+          import pathlib, re
+          source = pathlib.Path("dropit/__init__.py").read_text(encoding="utf-8")
+          match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', source)
+          if not match:
+              raise SystemExit("Could not find __version__ in dropit/__init__.py")
+          print(match.group(1))
+          PY
+          )"
+          echo "Package version: ${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          PUBLISHED="$(python - "$VERSION" <<'PY'
+          import json, sys, urllib.error, urllib.request
+
+          wanted = sys.argv[1]
+          try:
+              with urllib.request.urlopen("https://pypi.org/pypi/dropit/json", timeout=30) as response:
+                  releases = json.load(response).get("releases", {})
+          except urllib.error.HTTPError as error:
+              if error.code == 404:      # package has never been published
+                  print("no")
+                  raise SystemExit
+              raise
+          print("yes" if wanted in releases else "no")
+          PY
+          )"
+
+          if [ "${PUBLISHED}" = "yes" ]; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dropit ${VERSION} is already on PyPI. Bump __version__ to publish a new release."
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::dropit ${VERSION} is not on PyPI yet and will be published."
+          fi
+
   build:
+    name: Build and smoke test
+    needs: version
+    if: needs.version.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,6 +91,39 @@ jobs:
           python -m build
           python -m twine check --strict dist/*
 
+      - name: Verify the wheel carries the expected version
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED="${{ needs.version.outputs.version }}"
+          WHEEL="$(ls -1 dist/*.whl | head -n 1)"
+
+          ACTUAL="$(python - "$WHEEL" <<'PY'
+          import re, sys, zipfile
+
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              name = next(n for n in archive.namelist() if n.endswith(".dist-info/METADATA"))
+              text = archive.read(name).decode("utf-8", "replace")
+          match = re.search(r"^Version:\s*(.+)$", text, re.M)
+          if not match:
+              raise SystemExit("Could not parse Version from wheel METADATA")
+          print(match.group(1).strip())
+          PY
+          )"
+
+          echo "Expected ${EXPECTED}, wheel reports ${ACTUAL}"
+          [ "${EXPECTED}" = "${ACTUAL}" ] || { echo "Version mismatch"; exit 1; }
+
+      - name: Install the wheel in a clean environment and run it
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/dropit --version
+          # Importing the app proves the declared dependencies are actually complete.
+          /tmp/smoke/bin/python -c "import sys; sys.argv=['dropit']; import dropit.main; print('import ok')"
+
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -39,59 +131,26 @@ jobs:
           path: dist/*
 
   publish:
-    needs: build
+    name: Publish to PyPI and tag the release
+    needs: [version, build]
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
+      contents: write   # needed to push the release tag
 
     environment:
       name: pypi
       url: https://pypi.org/project/dropit/
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download dist artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
-
-      - name: Verify tag matches package version
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          WHEEL="$(ls -1 dist/*.whl | head -n 1)"
-          TAG_REF="${GITHUB_REF#refs/tags/}"
-
-          read -r NAME VERSION < <(python - <<'PY' "$WHEEL"
-          import re, sys, zipfile
-
-          wheel = sys.argv[1]
-          with zipfile.ZipFile(wheel) as z:
-              meta = next(n for n in z.namelist() if n.endswith(".dist-info/METADATA"))
-              text = z.read(meta).decode("utf-8", "replace")
-
-          name_match = re.search(r"^Name:\s*(.+)$", text, re.M)
-          version_match = re.search(r"^Version:\s*(.+)$", text, re.M)
-          if not name_match or not version_match:
-              raise SystemExit("Could not parse Name/Version from wheel METADATA")
-          print(name_match.group(1).strip(), version_match.group(1).strip())
-          PY
-          )
-
-          echo "Detected package: ${NAME} ${VERSION}"
-
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG_VERSION="${TAG_REF#v}"
-            echo "Tag version: ${TAG_VERSION}"
-            if [ "${VERSION}" != "${TAG_VERSION}" ]; then
-              echo "Tag v${TAG_VERSION} does not match package version ${VERSION}"
-              exit 1
-            fi
-          else
-            echo "Ref ${GITHUB_REF} is not a tag; skipping tag/version consistency check."
-          fi
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -100,3 +159,19 @@ jobs:
           password: ${{ secrets.PYPIRC_API_TOKEN }}
           packages-dir: dist/
           skip-existing: true
+
+      - name: Tag the released commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v${{ needs.version.outputs.version }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; leaving it alone."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
