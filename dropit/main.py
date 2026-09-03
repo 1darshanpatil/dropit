@@ -32,8 +32,11 @@ import threading
 import socket
 import argparse
 import datetime
+import ssl
+import sys
 import tempfile
 import time
+import traceback as traceback_module
 import zipfile
 from functools import wraps
 from urllib.parse import quote, urlsplit
@@ -391,6 +394,33 @@ def resolve_shared_path(relative_path='', require_directory=False):
     return candidate, normalized.replace(os.sep, '/')
 
 
+def resolve_upload_target(current_path, client_filename):
+    """Map a browser-supplied upload name onto a safe directory and bare filename.
+
+    A dragged folder sends names like ``holiday/2024/IMG_1.jpg``. The leading segments are
+    recreated as real folders under the current one; ``..`` and absolute paths are stripped
+    first and the result still goes through resolve_shared_path(), so an upload can never
+    land outside the share root.
+    """
+    cleaned = (client_filename or '').replace('\\', '/').replace('\x00', '')
+    parts = [part for part in cleaned.split('/') if part not in ('', '.', '..')]
+    if not parts:
+        return None
+
+    filename = parts[-1]
+    relative = '/'.join([part for part in [current_path, *parts[:-1]] if part])
+    directory, _ = resolve_shared_path(relative, require_directory=False)
+
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        abort(409)
+
+    if not os.path.isdir(directory):
+        abort(409)
+    return directory, filename
+
+
 def save_upload_without_overwrite(directory, file_storage, filename):
     """Write an upload privately, then publish it atomically under an unused name."""
     stem, extension = os.path.splitext(filename)
@@ -470,10 +500,11 @@ def index():
             if not file or not file.filename:
                 continue
 
-            filename = os.path.basename(file.filename.replace('\\', '/')).replace('\x00', '')
-            if filename in ('', '.', '..'):
+            target = resolve_upload_target(current_path, file.filename)
+            if target is None:
                 continue
-            save_upload_without_overwrite(current_directory, file, filename)
+            directory, filename = target
+            save_upload_without_overwrite(directory, file, filename)
 
         return redirect(url_for('index', path=current_path) if current_path else url_for('index'))
 
@@ -1011,48 +1042,196 @@ def ensure_certificate(ip):
     return CERTIFICATE_PATH, PRIVATE_KEY_PATH
 
 
+QUIET_SOCKET_ERRNOS = frozenset({
+    errno.EBADF, errno.EPIPE, errno.ECONNRESET, errno.ENOTCONN, errno.ESHUTDOWN, errno.ECONNABORTED,
+})
+
+STATUS_COLORS = {'2': 'green', '3': 'cyan', '4': 'yellow', '5': 'red'}
+
+
+def shorten_path(path, width=44):
+    """Trim a long path from the middle so the extension stays readable."""
+    if len(path) <= width:
+        return path
+    keep = width - 1
+    head = keep // 2
+    return f"{path[:head]}…{path[-(keep - head):]}"
+
+
+class ConsoleLog:
+    """Human-readable server output.
+
+    Runs of identical lines are collapsed: streaming one video produces dozens of 206
+    range requests, and left alone they bury everything actually worth reading.
+    """
+
+    def __init__(self, stream=None):
+        self.stream = stream or sys.stdout
+        self.use_color = bool(getattr(self.stream, 'isatty', lambda: False)())
+        self._lock = threading.Lock()
+        self._last_line = None
+        self._repeats = 0
+        self._hinted = set()
+
+    def _write(self, text):
+        self.stream.write(text + '\n')
+        self.stream.flush()
+
+    def _paint(self, text, color):
+        return print_colored(text, color) if (self.use_color and color) else text
+
+    def _flush_repeats(self):
+        if self._repeats > 1:
+            self._write(self._paint(f"          ⤷ repeated {self._repeats} times", 'blue'))
+        self._last_line = None
+        self._repeats = 0
+
+    def request(self, address, method, path, status_line):
+        code = status_line.split(' ', 1)[0]
+        key = (address, method, path, code)
+        with self._lock:
+            if key == self._last_line:
+                self._repeats += 1
+                return
+            self._flush_repeats()
+            self._last_line = key
+            self._repeats = 1
+            line = (f"{time.strftime('%H:%M:%S')}  {address:<15} {method:<4} "
+                    f"{shorten_path(path):<44} {code}")
+            self._write(self._paint(line, STATUS_COLORS.get(code[:1])))
+
+    def note(self, message, color='yellow'):
+        with self._lock:
+            self._flush_repeats()
+            self._write(self._paint(f"{time.strftime('%H:%M:%S')}  {message}", color))
+
+    def note_once(self, key, message, color='yellow'):
+        """Say something actionable the first time only, then stay quiet about it."""
+        with self._lock:
+            if key in self._hinted:
+                return
+            self._hinted.add(key)
+        self.note(message, color)
+
+    def problem(self, summary, detail=None):
+        """An error worth a developer's attention: one line, with the traceback indented."""
+        self.note(summary, 'red')
+        if detail:
+            with self._lock:
+                for line in detail.rstrip().splitlines():
+                    self._write(f"    {line}")
+
+
+console = ConsoleLog()
+
+
+# cheroot reports some conditions as a plain message with no exception attached, so the
+# same wording has to be recognisable from the text alone.
+CONNECTION_HINTS = (
+    (('HTTP_REQUEST',),
+     'A device asked for http:// on the secure port. Use the https:// address shown above, '
+     'or restart with --http.'),
+    (('CERTIFICATE_UNKNOWN', 'UNKNOWN_CA', 'BAD_CERTIFICATE', 'certificate unknown'),
+     'A device refused the certificate. Open /certificate on it and install the certificate, '
+     'or restart with --http.'),
+)
+
+
+def describe_connection_text(text):
+    """Match cheroot's own wording for conditions it reports without an exception."""
+    for markers, message in CONNECTION_HINTS:
+        if any(marker in text for marker in markers):
+            return message
+    return None
+
+
+def describe_connection_error(exception):
+    """Render an expected network hiccup as one sentence, or None if it is a real error.
+
+    Phones pause videos, close tabs mid-download, and abandon speculative connections.
+    None of that is a fault in the server, so none of it deserves a traceback.
+    """
+    if isinstance(exception, ssl.SSLError):
+        return describe_connection_text(str(exception)) or 'A device closed the secure connection early.'
+
+    if isinstance(exception, TimeoutError):
+        return 'Transfer stopped: the device stopped reading (paused, or moved on).'
+
+    if isinstance(exception, (ConnectionResetError, BrokenPipeError)):
+        return 'Transfer cancelled by the device.'
+
+    if isinstance(exception, OSError) and exception.errno in QUIET_SOCKET_ERRNOS:
+        return 'Connection closed by the device.'
+
+    return None
+
+
+def install_quiet_unraisable_hook():
+    """Stop the garbage collector from printing tracebacks about already-closed sockets.
+
+    When a transfer is abandoned, cheroot's buffered writer is finalised after its socket
+    has gone. CPython then prints a full "Exception ignored in __del__" traceback that the
+    user can neither act on nor prevent. Anything that is not that is passed through.
+    """
+    previous_hook = sys.unraisablehook
+
+    def hook(unraisable):
+        exception = unraisable.exc_value
+        if isinstance(exception, OSError) and exception.errno in QUIET_SOCKET_ERRNOS:
+            return
+        if isinstance(exception, ValueError) and 'closed file' in str(exception):
+            return
+        previous_hook(unraisable)
+
+    sys.unraisablehook = hook
+
+
 class AccessLog:
-    """Minimal WSGI middleware that reports each request, the way the old server did."""
+    """WSGI middleware that reports each request as one aligned line."""
 
     def __init__(self, application):
         self.application = application
 
     def __call__(self, environ, start_response):
         def logging_start_response(status, headers, exc_info=None):
-            print(f"{environ.get('REMOTE_ADDR', '-')} "
-                  f"{environ.get('REQUEST_METHOD', '-')} "
-                  f"{environ.get('PATH_INFO', '-')} {status.split(' ', 1)[0]}", flush=True)
+            console.request(
+                environ.get('REMOTE_ADDR', '-'),
+                environ.get('REQUEST_METHOD', '-'),
+                environ.get('PATH_INFO', '-'),
+                status,
+            )
             return start_response(status, headers, exc_info)
 
         return self.application(environ, logging_start_response)
 
 
-def quiet_rejected_certificate_logs(server, port):
-    """Replace repeated 'certificate unknown' handshake noise with one actionable hint.
+def build_quiet_server(base_class):
+    """Subclass cheroot's server so its error reporting goes through ConsoleLog."""
 
-    A device that has not been told to trust the certificate aborts the TLS handshake on
-    every speculative connection it opens, which floods the console. The download managers
-    on iOS and Android are the worst offenders: they do not inherit the "proceed anyway"
-    exception the browser got, so they reject on their own and the download quietly fails.
-    """
-    warned = threading.Event()
-    original = server.error_log
+    class QuietServer(base_class):
+        def error_log(self, msg='', level=20, traceback=False):
+            exception = sys.exc_info()[1] if traceback else None
 
-    def error_log(message='', level=20, traceback=False):
-        if 'CERTIFICATE_UNKNOWN' in message or 'certificate unknown' in message:
-            if not warned.is_set():
-                warned.set()
-                print(print_colored(
-                    'A device rejected the certificate. Downloads often fail this way, because '
-                    'phone download managers do not inherit the browser\'s "proceed anyway".',
-                    'yellow'))
-                print(print_colored(
-                    f'  Fix it for good: open https://<this-machine>:{port}/certificate on the '
-                    f'device and install it, or restart with --http.', 'yellow'))
-            return
-        return original(message, level, traceback)
+            description = describe_connection_text(msg) if msg else None
+            if description is None and exception is not None:
+                description = describe_connection_error(exception)
 
-    server.error_log = error_log
+            if description is not None:
+                # These are setup hints, not events: saying them once is enough.
+                console.note_once(description, description)
+                return
+
+            if exception is not None:
+                console.problem(
+                    f"{msg or 'Server error'}: {type(exception).__name__}: {exception}",
+                    traceback_module.format_exc(),
+                )
+                return
+
+            if msg:
+                console.note(msg, 'blue')
+
+    return QuietServer
 
 
 def serve_forever(wsgi_app, host, port, ssl_files=None, threads=DEFAULT_WORKER_THREADS):
@@ -1065,27 +1244,29 @@ def serve_forever(wsgi_app, host, port, ssl_files=None, threads=DEFAULT_WORKER_T
     try:
         from cheroot.wsgi import Server as CherootServer
     except ImportError:
-        print(print_colored(
-            'cheroot is not installed; falling back to the slower development server.', 'yellow'))
+        console.note('cheroot is not installed; falling back to the slower development server.')
         from werkzeug.serving import run_simple
 
         run_simple(host, port, wsgi_app, threaded=True,
                    ssl_context=tuple(ssl_files) if ssl_files else None)
         return
 
-    server = CherootServer((host, port), wsgi_app, numthreads=threads, request_queue_size=128)
+    install_quiet_unraisable_hook()
+
+    server = build_quiet_server(CherootServer)(
+        (host, port), wsgi_app, numthreads=threads, request_queue_size=128)
     if ssl_files:
         from cheroot.ssl.builtin import BuiltinSSLAdapter
 
         server.ssl_adapter = BuiltinSSLAdapter(*ssl_files)
-        quiet_rejected_certificate_logs(server, port)
 
     try:
         server.safe_start()
     except KeyboardInterrupt:
-        server.stop()
+        pass
     finally:
         server.stop()
+        console.note('Dropit stopped.', 'blue')
 
 
 def run_app():
