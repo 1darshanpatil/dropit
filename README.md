@@ -101,9 +101,10 @@ Dropit regenerates the certificate automatically if your LAN IP changes or it is
   Nothing is staged on disk first, so even a multi-gigabyte folder starts immediately.
 - **Progress**: a tray in the bottom corner shows bytes transferred, percentage, speed, and
   time remaining, because the browser's own download manager is invisible to the page.
-- **Upload**: drag files anywhere onto the page, or use **Upload** in the toolbar, then
-  **Upload Here**. Uploads land in the folder you are currently viewing and never overwrite an
-  existing file — a duplicate name is saved as `name (1).ext`.
+- **Upload**: drag files *or whole folders* anywhere onto the page, or use **Upload** in the
+  toolbar, then **Upload Here**. A dropped folder is walked recursively and its structure is
+  recreated on the server. Uploads land in the folder you are currently viewing and never
+  overwrite an existing file — a duplicate name is saved as `name (1).ext`.
 - **Deleting**: folders must be empty before they can be removed.
 - **Storage**: uploaded files are saved to `sharex` under your home directory (`$HOME/sharex` on
   Linux/macOS, `%USERPROFILE%\\sharex` on Windows).

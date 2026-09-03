@@ -1032,35 +1032,108 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus('Uploading files into this folder…');
     });
 
+    const draggingFiles = (event) => Boolean(event.dataTransfer?.types?.includes('Files'));
+
+    const resetDragState = () => {
+        dragDepth = 0;
+        dropIndicator.hidden = true;
+    };
+
+    // Read a dropped directory tree. readEntries() returns at most 100 children per call,
+    // so it has to be drained in a loop or large folders silently lose files.
+    const readAllEntries = (reader) => new Promise((resolve, reject) => {
+        const collected = [];
+        const readBatch = () => reader.readEntries((batch) => {
+            if (!batch.length) {
+                resolve(collected);
+                return;
+            }
+            collected.push(...batch);
+            readBatch();
+        }, reject);
+        readBatch();
+    });
+
+    const collectEntry = async (entry, prefix, collected) => {
+        if (!entry) return;
+
+        if (entry.isFile) {
+            const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+            const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+            // The relative path rides along as the file's name; the server recreates the
+            // folders from it. Wrapping the blob does not copy the bytes.
+            collected.push(relativePath === file.name
+                ? file
+                : new File([file], relativePath, { type: file.type, lastModified: file.lastModified }));
+            return;
+        }
+
+        if (!entry.isDirectory) return;
+        const nestedPrefix = prefix ? `${prefix}/${entry.name}` : entry.name;
+        const children = await readAllEntries(entry.createReader());
+        for (const child of children) {
+            await collectEntry(child, nestedPrefix, collected);
+        }
+    };
+
     document.addEventListener('dragenter', (event) => {
-        if (!event.dataTransfer?.types?.includes('Files')) return;
+        if (!draggingFiles(event)) return;
         event.preventDefault();
         dragDepth += 1;
         dropIndicator.hidden = false;
     });
 
     document.addEventListener('dragover', (event) => {
-        if (!event.dataTransfer?.types?.includes('Files')) return;
+        if (!draggingFiles(event)) return;
         event.preventDefault();
     });
 
     document.addEventListener('dragleave', (event) => {
-        if (!event.dataTransfer?.types?.includes('Files')) return;
+        if (!draggingFiles(event)) return;
         dragDepth = Math.max(0, dragDepth - 1);
         if (dragDepth === 0) dropIndicator.hidden = true;
     });
 
-    document.addEventListener('drop', (event) => {
-        if (!event.dataTransfer?.files?.length) return;
-        event.preventDefault();
-        dragDepth = 0;
-        dropIndicator.hidden = true;
-        replaceQueuedFiles([...queuedFiles, ...Array.from(event.dataTransfer.files)]);
-    });
+    // A drag that ends without a matching dragleave — cancelled with Esc, or released
+    // outside the window — would otherwise strand the overlay over the whole file list.
+    document.addEventListener('dragend', resetDragState);
+    window.addEventListener('blur', resetDragState);
 
-    transferDismiss.addEventListener('click', () => {
-        stopTransferPoll();
-        transferTray.hidden = true;
+    document.addEventListener('drop', (event) => {
+        // Always swallow the drop: letting the browser handle a stray link or text drag
+        // navigates away from the app and loses the current folder.
+        event.preventDefault();
+        resetDragState();
+        if (!draggingFiles(event)) return;
+
+        // webkitGetAsEntry() must be called while the event is still being dispatched.
+        const entries = Array.from(event.dataTransfer.items || [])
+            .map((item) => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
+            .filter(Boolean);
+        const droppedFiles = Array.from(event.dataTransfer.files || []);
+
+        if (!entries.some((entry) => entry.isDirectory)) {
+            if (droppedFiles.length) replaceQueuedFiles([...queuedFiles, ...droppedFiles]);
+            return;
+        }
+
+        setStatus('Scanning dropped folders…');
+        (async () => {
+            const collected = [];
+            try {
+                for (const entry of entries) {
+                    await collectEntry(entry, '', collected);
+                }
+            } catch (_error) {
+                setStatus('Could not read one of the dropped folders');
+            }
+
+            if (!collected.length) {
+                setStatus('Those folders were empty');
+                return;
+            }
+            replaceQueuedFiles([...queuedFiles, ...collected]);
+        })();
     });
 
     document.querySelectorAll('[data-close-preview]').forEach((button) => button.addEventListener('click', closeImagePreview));
