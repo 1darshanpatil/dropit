@@ -927,6 +927,7 @@ input[type="checkbox"] {
 .transfer-tray {
     position: absolute;
     z-index: 17;
+    overflow: hidden;
     right: 14px;
     bottom: 14px;
     left: auto;
@@ -945,6 +946,7 @@ input[type="checkbox"] {
 
 .transfer-head {
     display: flex;
+    min-width: 0;
     align-items: center;
     gap: 8px;
 }
@@ -985,9 +987,13 @@ input[type="checkbox"] {
 }
 
 .transfer-detail {
+    min-width: 0;
+    overflow: hidden;
     color: var(--muted);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .drop-indicator {
