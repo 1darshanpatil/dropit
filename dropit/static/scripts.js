@@ -412,6 +412,8 @@ document.addEventListener('DOMContentLoaded', () => {
         transferTray.hidden = false;
         transferTray.classList.remove('is-done', 'is-failed');
         transferName.textContent = label;
+        // The name is ellipsised when it does not fit, so keep the whole one reachable.
+        transferName.title = label;
         transferFill.style.width = '0%';
         transferDetail.textContent = 'Preparing…';
 
